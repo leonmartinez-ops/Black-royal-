@@ -353,9 +353,9 @@ input[type=range]::-webkit-slider-thumb{
   <section class="screen on" id="s-terminal">
     <div class="card">
       <div class="jsel">
-        <button id="j-prev" aria-label="Jornada anterior">‹</button>
-        <div class="val"><b id="j-num">Jornada 4</b><span id="j-sub">TEMPORADA DEMO</span></div>
-        <button id="j-next" aria-label="Jornada siguiente">›</button>
+        <button id="j-prev" aria-label="Competición anterior">‹</button>
+        <div class="val"><b id="j-num">LIGA MX</b><span id="j-sub">—</span></div>
+        <button id="j-next" aria-label="Competición siguiente">›</button>
       </div>
       <div class="stats">
         <div class="stat cyan"><span>Banca simulada</span><b id="t-banca">$10,000<small> MXN</small></b></div>
@@ -420,7 +420,7 @@ input[type=range]::-webkit-slider-thumb{
   <!-- ================= JORNADA ================= -->
   <section class="screen" id="s-jornada">
     <div class="card flat">
-      <div class="head"><h2 id="jj-title">Jornada 4</h2><span id="jj-count">0/9 analizados</span></div>
+      <div class="head"><h2 id="jj-title">—</h2><span id="jj-count">0/0 analizados</span></div>
       <p class="note">Toca un partido para abrir su análisis. El botón <b>+</b> lo añade al simulador de exposición.</p>
     </div>
     <div id="match-list"></div>
@@ -448,6 +448,13 @@ input[type=range]::-webkit-slider-thumb{
     </div>
 
     <div class="card">
+      <div class="head"><h2>Procedencia de los datos</h2><span>honestidad</span></div>
+      <p class="note">Equipos, fechas y horas de Liga MX y Leagues Cup: calendario público consultado el 8 ago 2026 — verifica contra la fuente oficial antes de decidir nada, los calendarios se mueven.</p>
+      <p class="note" style="margin-top:8px">Mercado (1X2): en los partidos marcados, es probabilidad implícita real calculada a partir de momios públicos, con el margen de la casa retirado. Donde no hay momios todavía, el mercado se muestra SIN EVIDENCIA — no se inventa.</p>
+      <p class="note" style="margin-top:8px"><b style="color:var(--text)">RIS y Riesgo siguen sin ser un modelo propio</b>: por ahora son una transformación simple y declarada del mercado, no una predicción independiente. Por eso la integridad general de estos partidos es baja a propósito.</p>
+    </div>
+
+    <div class="card">
       <div class="head"><h2>Separación de capas</h2><span>método</span></div>
       <div class="row"><div class="nm"><b>Datos</b><small>Observaciones crudas y su cobertura.</small></div><div class="pill info">FUENTE</div></div>
       <div class="row"><div class="nm"><b>Mercado</b><small>Lo que la línea implica hoy.</small></div><div class="pill info">AZUL</div></div>
@@ -462,7 +469,7 @@ input[type=range]::-webkit-slider-thumb{
       <button class="btn danger" id="reset" style="margin-top:14px">REINICIAR DEMO</button>
     </div>
 
-    <p class="foot">BLACK ROYAL · RIS MOBILE TERMINAL · LOCAL PROTOTYPE v0.1<br>Todos los datos son demostrativos. Prototipo educativo de visualización.</p>
+    <p class="foot">BLACK ROYAL · RIS MOBILE TERMINAL · PROTOTYPE v0.2<br>Fixtures reales de Liga MX y Leagues Cup. Mercado real donde hay momios; RIS/Riesgo aún no son un modelo propio. Prototipo educativo de visualización.</p>
   </section>
 
 </main>
@@ -550,38 +557,64 @@ var GRUPOS = [
   {id:'combinados', nombre:'COMBINADOS'}
 ];
 
-var JORNADA = {
-  numero: 4,
-  temporada: 'TEMPORADA DEMO',
-  partidos: [
-    {id:'p1', local:'Toluca', visitante:'Pumas UNAM', hora:'19:00', cobertura:84, confianza:72, fuente:80, muestra:132,
-     m:{'1x2':[78,66,24,88],'dc':[73,60,48,86],'h1':[52,47,50,74],'h2':[56,51,46,72],'btts':[57,53,42,82],'ou25':[61,58,38,84],'tot':[55,50,44,78],'cor':[30,25,78,26],'tar':[44,39,58,52],'rou':[64,55,51,66],'dcg':[68,51,56,62]}},
+/* Construye el objeto de mercados de un partido. x2 = [mercado, ris, riesgo, evidencia]
+   para 1X2 si hay momios reales, o null si no. El resto de los 10 mercados nace en
+   evidencia baja (6) hasta que se consigan momios reales para ellos también: el sistema
+   los mostrará como SIN EVIDENCIA en vez de inventar un número. */
+function baseMercados(x2){
+  var ids = ['1x2','dc','h1','h2','btts','ou25','tot','cor','tar','rou','dcg'];
+  var out = {};
+  ids.forEach(function(id){ out[id] = [0,0,0,6]; });
+  if(x2) out['1x2'] = x2;
+  return out;
+}
 
-    {id:'p2', local:'Monterrey', visitante:'Atlas', hora:'21:05', cobertura:76, confianza:64, fuente:74, muestra:110,
-     m:{'1x2':[71,63,31,84],'dc':[69,62,35,82],'h1':[48,44,55,68],'h2':[54,49,48,70],'btts':[52,55,45,78],'ou25':[66,61,34,82],'tot':[58,54,41,74],'cor':[36,28,72,32],'tar':[47,41,55,55],'rou':[59,50,54,62],'dcg':[62,49,59,58]}},
-
-    {id:'p3', local:'Cruz Azul', visitante:'Necaxa', hora:'17:00', cobertura:69, confianza:58, fuente:71, muestra:96,
-     m:{'1x2':[74,58,36,80],'dc':[70,59,39,78],'h1':[46,42,58,62],'h2':[51,46,52,64],'btts':[49,46,50,72],'ou25':[57,52,44,76],'tot':[53,47,48,70],'cor':[28,22,80,22],'tar':[42,37,60,48],'rou':[55,46,58,58],'dcg':[58,45,62,54]}},
-
-    {id:'p4', local:'Tigres UANL', visitante:'León', hora:'19:00', cobertura:81, confianza:70, fuente:77, muestra:124,
-     m:{'1x2':[66,64,29,86],'dc':[68,65,32,85],'h1':[50,48,49,72],'h2':[55,53,44,73],'btts':[61,60,35,84],'ou25':[64,62,33,85],'tot':[59,56,39,79],'cor':[41,34,66,38],'tar':[46,43,52,58],'rou':[62,57,45,68],'dcg':[65,56,49,64]}},
-
-    {id:'p5', local:'Santos Laguna', visitante:'Puebla', hora:'21:00', cobertura:41, confianza:29, fuente:44, muestra:31,
-     m:{'1x2':[58,34,66,30],'dc':[55,33,64,29],'h1':[40,24,74,20],'h2':[43,26,71,21],'btts':[47,30,68,28],'ou25':[51,32,65,31],'tot':[44,27,70,24],'cor':[22,14,86,12],'tar':[33,20,78,18],'rou':[45,26,74,20],'dcg':[48,28,72,19]}},
-
-    {id:'p6', local:'América', visitante:'Querétaro', hora:'12:00', cobertura:88, confianza:79, fuente:84, muestra:148,
-     m:{'1x2':[86,74,19,92],'dc':[82,73,22,91],'h1':[58,53,42,80],'h2':[61,57,38,79],'btts':[48,45,47,86],'ou25':[69,66,28,89],'tot':[64,60,33,83],'cor':[45,38,61,44],'tar':[51,46,49,62],'rou':[71,63,38,73],'dcg':[74,64,41,70]}},
-
-    {id:'p7', local:'Guadalajara', visitante:'Tijuana', hora:'19:05', cobertura:73, confianza:61, fuente:72, muestra:104,
-     m:{'1x2':[62,57,41,80],'dc':[66,60,37,79],'h1':[47,43,57,66],'h2':[52,48,51,67],'btts':[56,54,43,77],'ou25':[58,55,42,78],'tot':[54,50,46,72],'cor':[34,27,74,29],'tar':[49,44,53,54],'rou':[57,50,53,61],'dcg':[60,50,56,57]}},
-
-    {id:'p8', local:'Pachuca', visitante:'Mazatlán', hora:'17:00', cobertura:64, confianza:52, fuente:66, muestra:87,
-     m:{'1x2':[69,55,43,74],'dc':[67,57,40,73],'h1':[44,39,61,58],'h2':[49,44,56,59],'btts':[53,48,49,68],'ou25':[62,55,41,72],'tot':[56,49,47,66],'cor':[31,24,77,24],'tar':[45,38,58,46],'rou':[54,45,60,54],'dcg':[57,44,63,50]}},
-
-    {id:'p9', local:'Atlético San Luis', visitante:'Juárez', hora:'21:05', cobertura:36, confianza:24, fuente:39, muestra:22,
-     m:{'1x2':[54,29,72,24],'dc':[52,28,70,23],'h1':[37,21,79,15],'h2':[40,23,76,16],'btts':[45,27,71,22],'ou25':[49,30,69,25],'tot':[42,25,74,19],'cor':[20,12,88,9],'tar':[30,18,81,14],'rou':[43,24,77,16],'dcg':[46,25,75,15]}}
-  ]
-};
+/* ================================================================
+   TORNEOS — Liga MX y Leagues Cup, con partidos y horarios reales.
+   Fuente: calendario público de scores24.live, consultado 8 ago 2026.
+   Momios reales convertidos a probabilidad implícita (mercado 1X2):
+   sólo los partidos marcados llevan momios verificados; el resto
+   está SIN EVIDENCIA hasta conseguir su línea de mercado.
+   RIS y Riesgo son todavía una transformación simple del mercado,
+   NO un modelo propio — ver nota en pantalla RIS.
+   Verifica fecha/hora contra la fuente oficial antes de usarlas para
+   decisiones: los calendarios pueden moverse.
+   ================================================================ */
+var TORNEOS = [
+  {
+    id:'ligamx', liga:'LIGA MX', etiqueta:'Jornada 4 · Apertura 2026',
+    partidos:[
+      {id:'mx1', local:'Atlante', visitante:'Deportivo Toluca', fecha:'15 ago', hora:'23:00',
+       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)},
+      {id:'mx2', local:'Monterrey', visitante:'Juárez', fecha:'16 ago', hora:'01:00',
+       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)},
+      {id:'mx3', local:'Atlas', visitante:'Tigres UANL', fecha:'16 ago', hora:'03:00',
+       cobertura:38, confianza:22, fuente:80, muestra:18, m:baseMercados([45,39,60,88])},
+      {id:'mx4', local:'Pumas UNAM', visitante:'Querétaro', fecha:'16 ago', hora:'18:00',
+       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)},
+      {id:'mx5', local:'América', visitante:'San Luís', fecha:'16 ago', hora:'23:00',
+       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)}
+    ]
+  },
+  {
+    id:'leaguescup', liga:'LEAGUES CUP', etiqueta:'Fase de grupos · 2026',
+    partidos:[
+      {id:'lc1', local:'Orlando City', visitante:'Club León', fecha:'8 ago', hora:'22:30',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([66,60,39,82])},
+      {id:'lc2', local:'Inter Miami', visitante:'Monterrey', fecha:'9 ago', hora:'00:00',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([85,79,20,84])},
+      {id:'lc3', local:'Guadalajara Chivas', visitante:'Dallas', fecha:'9 ago', hora:'01:00',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([65,59,40,80])},
+      {id:'lc4', local:'Real Salt Lake', visitante:'Atlante', fecha:'9 ago', hora:'02:00',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([69,63,36,83])},
+      {id:'lc5', local:'Deportivo Toluca', visitante:'Los Angeles FC', fecha:'9 ago', hora:'03:10',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([67,61,38,81])},
+      {id:'lc6', local:'Seattle Sounders', visitante:'Querétaro', fecha:'9 ago', hora:'19:30',
+       cobertura:38, confianza:22, fuente:78, muestra:18, m:baseMercados([64,58,41,79])}
+    ]
+  }
+];
+function torneoActual(){ return TORNEOS[torneoIdx]; }
 
 var DEMOS = [
   {id:'real',  nombre:'DATOS DEMO'},
@@ -627,8 +660,8 @@ function wipe(){
 
 var DEFAULT_STATE = {
   vista:'terminal',
-  jornada:JORNADA.numero,
-  sel:'p1',
+  torneo:0,
+  sel:'mx1',
   tabG:'resumen',
   tabD:'resumen',
   banca:10000,
@@ -641,14 +674,19 @@ var DEFAULT_STATE = {
 var S = Object.assign({}, DEFAULT_STATE);
 var saved = load();
 if(saved){ S = Object.assign({}, DEFAULT_STATE, saved); }
+var torneoIdx = clampInt(S.torneo||0, 0, TORNEOS.length-1);
+function clampInt(v,a,b){ return Math.max(a,Math.min(b,v|0)); }
 
 /* ============================================================
    3. MODELO — cálculos derivados
    ============================================================ */
 
 function getPartido(id){
-  for(var i=0;i<JORNADA.partidos.length;i++){ if(JORNADA.partidos[i].id===id) return JORNADA.partidos[i]; }
-  return JORNADA.partidos[0];
+  for(var t=0;t<TORNEOS.length;t++){
+    var ps = TORNEOS[t].partidos;
+    for(var i=0;i<ps.length;i++){ if(ps[i].id===id) return ps[i]; }
+  }
+  return TORNEOS[0].partidos[0];
 }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
@@ -890,17 +928,18 @@ function drawIntegrity(prefix, p){
 
 /* ---------- TERMINAL ---------- */
 function renderTerminal(){
-  $('j-num').innerHTML = 'Jornada ' + JORNADA.numero;
-  $('j-sub').innerHTML = JORNADA.temporada;
+  var TA = torneoActual();
+  $('j-num').innerHTML = TA.liga;
+  $('j-sub').innerHTML = TA.etiqueta;
 
   var an = 0;
-  JORNADA.partidos.forEach(function(p){ if(integrity(vista(p)).ok) an++; });
+  TA.partidos.forEach(function(p){ if(integrity(vista(p)).ok) an++; });
   var r = simResumen();
 
   tween($('t-banca'), S.banca, function(v){ return fmtMoney(v)+'<small> MXN</small>'; });
   tween($('t-exp'), r.total, function(v){ return fmtMoney(v); });
   tween($('t-risk'), r.riesgo, function(v){ return Math.round(v)+'%'; });
-  $('t-an').innerHTML = an + '/' + JORNADA.partidos.length;
+  $('t-an').innerHTML = an + '/' + TA.partidos.length;
   $('t-risk').parentNode.className = 'stat ' + (r.riesgo>=60?'red':r.riesgo>=40?'orange':r.riesgo>0?'green':'');
 
   renderSim();
@@ -980,7 +1019,7 @@ function renderSimSummary(){
 function renderJornadaRead(){
   var n = $('jornada-read'); n.innerHTML='';
   var cands = [];
-  JORNADA.partidos.forEach(function(p0){
+  torneoActual().partidos.forEach(function(p0){
     var p = vista(p0); var i = integrity(p);
     if(!i.ok) return;
     var l = lectura(mercadosDe(p,'resumen'));
@@ -1040,18 +1079,19 @@ function renderGraficas(){
 
 /* ---------- JORNADA ---------- */
 function renderJornada(){
-  $('jj-title').innerHTML = 'Jornada ' + JORNADA.numero;
-  var an=0; JORNADA.partidos.forEach(function(p){ if(integrity(vista(p)).ok) an++; });
-  $('jj-count').innerHTML = an + '/' + JORNADA.partidos.length + ' analizados';
+  var TA = torneoActual();
+  $('jj-title').innerHTML = TA.liga + ' · ' + TA.etiqueta;
+  var an=0; TA.partidos.forEach(function(p){ if(integrity(vista(p)).ok) an++; });
+  $('jj-count').innerHTML = an + '/' + TA.partidos.length + ' analizados';
 
   var n = $('match-list'); n.innerHTML='';
-  JORNADA.partidos.forEach(function(p0, k){
+  TA.partidos.forEach(function(p0, k){
     var p = vista(p0), st = estado(p);
     var wrap = el('div','match'+(S.sel===p.id?' sel':''));
     wrap.innerHTML =
       '<div class="idx">'+(k<9?'0':'')+(k+1)+'</div>'+
       '<div class="who"><b>'+p.local+' vs '+p.visitante+'</b>'+
-        '<small>'+p.hora+' · integridad '+integrity(p).score+'/100</small></div>';
+        '<small>'+(p0.fecha?p0.fecha+' · ':'')+p.hora+' · integridad '+integrity(p).score+'/100</small></div>';
     var side = el('div','side');
     side.innerHTML = '<div class="st"><i class="dot" style="background:'+st.c+'"></i>'+st.t+'</div>';
     wrap.appendChild(side);
@@ -1194,8 +1234,14 @@ Array.prototype.slice.call($('nav').children).forEach(function(b){
 $('sheet-back').onclick = closeSheet;
 $('d-add').onclick = function(){ toggleActivo(S.sel); renderSheet(); renderTerminal(); renderJornada(); };
 
-$('j-prev').onclick = function(){ if(JORNADA.numero>1){ JORNADA.numero--; renderAll(); } };
-$('j-next').onclick = function(){ JORNADA.numero++; renderAll(); };
+function cambiarTorneo(delta){
+  torneoIdx = (torneoIdx + delta + TORNEOS.length) % TORNEOS.length;
+  S.torneo = torneoIdx;
+  S.sel = torneoActual().partidos[0].id;
+  save(); renderAll();
+}
+$('j-prev').onclick = function(){ cambiarTorneo(-1); };
+$('j-next').onclick = function(){ cambiarTorneo(1); };
 
 var bancaInput = $('banca');
 bancaInput.value = fmtMoney(S.banca).replace('$','');
@@ -1223,7 +1269,7 @@ $('fold-btn').onclick = function(){
 $('reset').onclick = function(){
   wipe();
   S = Object.assign({}, DEFAULT_STATE, {visibles:DEFAULT_STATE.visibles.slice(), activos:[], exposicion:{}});
-  JORNADA.numero = 4;
+  torneoIdx = 0;
   bancaInput.value = fmtMoney(S.banca).replace('$','');
   $('fold').classList.remove('on'); $('fold-btn').classList.remove('on');
   save(); setVista('terminal'); renderAll();
