@@ -1151,8 +1151,41 @@ function renderRis(){
 }
 
 /* ---------- DETALLE ---------- */
+async function cargarAnalisisPartido(p){
+  if(!p || !p.fixtureId) return;
+
+  try{
+    const res = await fetch(
+      '/.netlify/functions/api-football?endpoint=predictions&fixture=' + p.fixtureId
+    );
+
+    const data = await res.json();
+
+    console.log(
+      'BLACK ROYAL · Análisis fixture ' + p.fixtureId + ':',
+      data
+    );
+
+    p.apiAnalisis = data;
+    window.BLACK_ROYAL_PARTIDO_API = data;
+
+  }catch(error){
+    console.error(
+      'Error cargando análisis del partido:',
+      error
+    );
+  }
+}
 function openSheet(id){
-  S.sel = id; save();
+  S.sel = id;
+  save();
+
+  var p = getPartido(id);
+
+  if(p && p.fixtureId){
+    cargarAnalisisPartido(p);
+  }
+
   renderSheet();
   $('sheet').classList.add('on');
   document.body.style.overflow='hidden';
@@ -1299,9 +1332,10 @@ async function cargarLigaMX(){
         const fecha = new Date(p.fixture.date);
 
         return {
-          identificacion: 'api-' + p.fixture.id,
-          fixtureId: p.fixture.id,
-
+  id: 'api-' + p.fixture.id,
+  identificacion: 'api-' + p.fixture.id,
+  fixtureId: p.fixture.id,
+           
           local: p.teams.home.name,
           visitante: p.teams.away.name,
 
