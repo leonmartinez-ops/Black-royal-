@@ -1284,8 +1284,61 @@ async function cargarLigaMX(){
     const data = await res.json();
 
     console.log('BLACK ROYAL · Liga MX API:', data);
-
     window.BLACK_ROYAL_API = data;
+
+    if(data.response && data.response.length){
+
+      const rondaActual = data.response[0].league.round;
+
+      const partidosJornada = data.response.filter(
+        p => p.league.round === rondaActual
+      );
+
+      TORNEOS[0].partidos = partidosJornada.map((p, i) => {
+
+        const fecha = new Date(p.fixture.date);
+
+        return {
+          identificacion: 'api-' + p.fixture.id,
+          fixtureId: p.fixture.id,
+
+          local: p.teams.home.name,
+          visitante: p.teams.away.name,
+
+          logoLocal: p.teams.home.logo,
+          logoVisitante: p.teams.away.logo,
+
+          fecha: fecha.toLocaleDateString('es-MX', {
+            day:'2-digit',
+            month:'short',
+            year:'numeric',
+            timeZone:'America/Mexico_City'
+          }),
+
+          hora: fecha.toLocaleTimeString('es-MX', {
+            hour:'2-digit',
+            minute:'2-digit',
+            hour12:false,
+            timeZone:'America/Mexico_City'
+          }),
+
+          cobertura: 0,
+          confianza: 0,
+          fuente: 100,
+          muestra: 0,
+
+          metro: baseMercados(null)
+        };
+      });
+
+      console.log(
+        'BLACK ROYAL · Jornada cargada:',
+        rondaActual,
+        TORNEOS[0].partidos
+      );
+
+      renderAll();
+    }
 
   }catch(error){
     console.error('Error cargando Liga MX:', error);
