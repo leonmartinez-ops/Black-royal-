@@ -1278,6 +1278,21 @@ $('reset').onclick = function(){
 /* ============================================================
    6. ARRANQUE
    ============================================================ */
+async function cargarLigaMX(){
+  try{
+    const res = await fetch('/.netlify/functions/api-football?league=262&season=2026&next=10');
+    const data = await res.json();
+
+    console.log('BLACK ROYAL · Liga MX API:', data);
+
+    window.BLACK_ROYAL_API = data;
+
+  }catch(error){
+    console.error('Error cargando Liga MX:', error);
+  }
+}
+
+cargarLigaMX();
 renderAll();
 setVista(S.vista || 'terminal');
 </script>
