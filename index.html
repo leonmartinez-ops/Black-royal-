@@ -1169,6 +1169,20 @@ async function cargarAnalisisPartido(p){
     p.apiAnalisis = data;
     window.BLACK_ROYAL_PARTIDO_API = data;
 
+     const resOdds = await fetch(
+  '/.netlify/functions/api-football?endpoint=odds&fixture=' + p.fixtureId
+);
+
+const oddsData = await resOdds.json();
+
+console.log(
+  'BLACK ROYAL · Odds fixture ' + p.fixtureId + ':',
+  oddsData
+);
+
+p.apiOdds = oddsData;
+window.BLACK_ROYAL_ODDS_API = oddsData;
+
   }catch(error){
     console.error(
       'Error cargando análisis del partido:',
