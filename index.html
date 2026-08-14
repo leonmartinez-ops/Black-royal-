@@ -1155,6 +1155,11 @@ async function cargarAnalisisPartido(p){
   if(!p || !p.fixtureId) return;
 
   try{
+
+    /* ========================================
+       1. PREDICTIONS
+    ======================================== */
+
     const res = await fetch(
       '/.netlify/functions/api-football?endpoint=predictions&fixture=' + p.fixtureId
     );
@@ -1169,25 +1174,279 @@ async function cargarAnalisisPartido(p){
     p.apiAnalisis = data;
     window.BLACK_ROYAL_PARTIDO_API = data;
 
-     const resOdds = await fetch(
-  '/.netlify/functions/api-football?endpoint=odds&fixture=' + p.fixtureId
-);
 
-const oddsData = await resOdds.json();
+    /* ========================================
+       2. ODDS
+    ======================================== */
 
-console.log(
-  'BLACK ROYAL · Odds fixture ' + p.fixtureId + ':',
-  oddsData
-);
+    const resOdds = await fetch(
+      '/.netlify/functions/api-football?endpoint=odds&fixture=' + p.fixtureId
+    );
 
-p.apiOdds = oddsData;
-window.BLACK_ROYAL_ODDS_API = oddsData;
+    const oddsData = await resOdds.json();
+
+    console.log(
+      'BLACK ROYAL · Odds fixture ' + p.fixtureId + ':',
+      oddsData
+    );
+
+    p.apiOdds = oddsData;
+    window.BLACK_ROYAL_ODDS_API = oddsData;
+
+
+    /* ========================================
+       3. BLACK ROYAL DATA ENGINE V1
+    ======================================== */
+
+    p.m = baseMercados(null);
+
+    const pred =
+      data &&
+      data.response &&
+      data.response[0] &&
+      data.response[0].predictions;
+
+    const bookmakers =
+      oddsData &&
+      oddsData.response &&
+      oddsData.response[0] &&
+      oddsData.response[0].bookmakers;
+
+    const bets =
+      bookmakers &&
+      bookmakers[0] &&
+      bookmakers[0].bets
+        ? bookmakers[0].bets
+        : [];
+
+
+    function buscarMercado(nombre){
+      return bets.find(function(b){
+        return b.name === nombre;
+      });
+    }
+
+    function buscarValor(mercado, valor){
+      if(!mercado || !mercado.values) return null;
+
+      return mercado.values.find(function(v){
+        return v.value === valor;
+      });
+    }
+
+    function probCuota(odd){
+      odd = parseFloat(odd);
+
+      if(!odd || odd <= 0) return 0;
+
+      return Math.round(100 / odd);
+    }
+
+    function numPct(v){
+      if(v === undefined || v === null) return 0;
+
+      return parseFloat(
+        String(v).replace('%','')
+      ) || 0;
+    }
+
+
+    /* ========================================
+       4. 1X2
+    ======================================== */
+
+    const mw = buscarMercado('Match Winner');
+
+    if(mw && pred && pred.percent){
+
+      const homeOdd = buscarValor(mw,'Home');
+      const drawOdd = buscarValor(mw,'Draw');
+      const awayOdd = buscarValor(mw,'Away');
+
+      const modelo = {
+        Home: numPct(pred.percent.home),
+        Draw: numPct(pred.percent.draw),
+        Away: numPct(pred.percent.away)
+      };
+
+      const mercado = {
+        Home: homeOdd ? probCuota(homeOdd.odd) : 0,
+        Draw: drawOdd ? probCuota(drawOdd.odd) : 0,
+        Away: awayOdd ? probCuota(awayOdd.odd) : 0
+      };
+
+      var seleccion = 'Home';
+
+      if(modelo.Draw > modelo[seleccion]) seleccion = 'Draw';
+      if(modelo.Away > modelo[seleccion]) seleccion = 'Away';
+
+      var diferencia = Math.abs(
+        mercado[seleccion] - modelo[seleccion]
+      );
+
+      p.m['1x2'] = [
+        mercado[seleccion],
+        modelo[seleccion],
+        Math.min(100,Math.round(diferencia * 2)),
+        90
+      ];
+    }
+
+
+    /* ========================================
+       5. DOBLE OPORTUNIDAD
+    ======================================== */
+
+    const dc = buscarMercado('Double Chance');
+
+    if(dc && pred && pred.percent){
+
+      const h = numPct(pred.percent.home);
+      const d = numPct(pred.percent.draw);
+      const a = numPct(pred.percent.away);
+
+      const opciones = [
+        {
+          value:'Home/Draw',
+          modelo:h+d
+        },
+        {
+          value:'Home/Away',
+          modelo:h+a
+        },
+        {
+          value:'Draw/Away',
+          modelo:d+a
+        }
+      ];
+
+      opciones.sort(function(x,y){
+        return y.modelo-x.modelo;
+      });
+
+      const mejor = opciones[0];
+      const oddDC = buscarValor(dc,mejor.value);
+
+      if(oddDC){
+
+        const mercadoDC = probCuota(oddDC.odd);
+        const diffDC = Math.abs(
+          mercadoDC-mejor.modelo
+        );
+
+        p.m['dc'] = [
+          mercadoDC,
+          Math.round(mejor.modelo),
+          Math.min(100,Math.round(diffDC*2)),
+          90
+        ];
+      }
+    }
+
+
+    /* ========================================
+       6. OVER / UNDER 2.5
+       MARKET DATA REAL
+       MODEL SIGNAL SOLO SI EXISTE
+    ======================================== */
+
+    const ou = buscarMercado('Goals Over/Under');
+
+    if(ou){
+
+      const over25 = buscarValor(ou,'Over 2.5');
+      const under25 = buscarValor(ou,'Under 2.5');
+
+      if(over25 && under25){
+
+        const pOver = probCuota(over25.odd);
+        const pUnder = probCuota(under25.odd);
+
+        const lado =
+          pOver >= pUnder
+            ? pOver
+            : pUnder;
+
+        var modeloOU = 0;
+        var evidenciaOU = 35;
+
+        if(
+          pred &&
+          pred.under_over
+        ){
+          modeloOU = lado;
+          evidenciaOU = 70;
+        }
+
+        p.m['ou25'] = [
+          lado,
+          modeloOU,
+          modeloOU
+            ? Math.abs(lado-modeloOU)
+            : 50,
+          evidenciaOU
+        ];
+      }
+    }
+
+
+    /* ========================================
+       7. BOTH TEAMS SCORE
+       MARKET DATA
+    ======================================== */
+
+    const btts = buscarMercado('Both Teams Score');
+
+    if(btts){
+
+      const yes = buscarValor(btts,'Yes');
+      const no = buscarValor(btts,'No');
+
+      if(yes && no){
+
+        const py = probCuota(yes.odd);
+        const pn = probCuota(no.odd);
+
+        p.m['btts'] = [
+          Math.max(py,pn),
+          0,
+          50,
+          35
+        ];
+      }
+    }
+
+
+    /* ========================================
+       8. DATA QUALITY
+    ======================================== */
+
+    p.cobertura = 75;
+    p.confianza = 65;
+    p.fuente = 90;
+    p.muestra = 1;
+
+
+    console.log(
+      'BLACK ROYAL · Mercados procesados:',
+      p.m
+    );
+
+
+    /* ========================================
+       9. REDIBUJAR BLACK ROYAL
+    ======================================== */
+
+    renderSheet();
+    renderAll();
 
   }catch(error){
+
     console.error(
       'Error cargando análisis del partido:',
       error
     );
+
   }
 }
 function openSheet(id){
