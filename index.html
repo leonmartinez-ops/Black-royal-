@@ -749,10 +749,7 @@ function mercadosDe(p, grupo){
     out.push({
       id:M.id, nombre:M.nombre, corto:M.corto,
       market:a[0], ris:a[1], risk:a[2], ev:ev,
-valido: (
-  ev >= UMBRAL_EVIDENCIA &&
-  muestraScore(p.muestra) >= 45
-),
+valido: ev >= UMBRAL_EVIDENCIA,
       /* consistencia: mercado y modelo apuntando igual, castigado por riesgo */
       cons: Math.round(Math.min(a[0],a[1]) - Math.abs(a[0]-a[1])*0.9 - a[2]*0.35)
     });
