@@ -564,7 +564,7 @@ var GRUPOS = [
 function baseMercados(x2){
   var ids = ['1x2','dc','h1','h2','btts','ou25','tot','cor','tar','rou','dcg'];
   var out = {};
-  ids.forEach(function(id){ out[id] = [0,0,0,6]; });
+ ids.forEach(function(id){ out[id] = [null,null,null,6]; });
   if(x2) out['1x2'] = x2;
   return out;
 }
@@ -720,6 +720,9 @@ function muestraScore(n){ return Math.round(clamp(n/150*100,0,100)); }
 function integrity(p){
   var ms = muestraScore(p.muestra);
   var score = Math.round(p.cobertura*.35 + p.confianza*.30 + p.fuente*.20 + ms*.15);
+   if(ms < 45){
+  score = Math.min(score, UMBRAL_SCORE - 1);
+}
   var flags = [];
   if(p.cobertura < 55) flags.push('LOW DATA');
   if(ms < 45) flags.push('INSUFFICIENT SAMPLE');
@@ -746,7 +749,10 @@ function mercadosDe(p, grupo){
     out.push({
       id:M.id, nombre:M.nombre, corto:M.corto,
       market:a[0], ris:a[1], risk:a[2], ev:ev,
-      valido: ev >= UMBRAL_EVIDENCIA,
+valido: (
+  ev >= UMBRAL_EVIDENCIA &&
+  muestraScore(p.muestra) >= 45
+),
       /* consistencia: mercado y modelo apuntando igual, castigado por riesgo */
       cons: Math.round(Math.min(a[0],a[1]) - Math.abs(a[0]-a[1])*0.9 - a[2]*0.35)
     });
@@ -755,16 +761,57 @@ function mercadosDe(p, grupo){
 }
 
 function lectura(list){
-  var v = list.filter(function(m){ return m.valido; });
-  if(!v.length) return null;
-  var best = v.slice().sort(function(a,b){ return b.cons-a.cons; })[0];
-  var low  = v.slice().sort(function(a,b){ return a.risk-b.risk; })[0];
-  var unc  = list.slice().sort(function(a,b){ return (b.risk+(100-b.ev)) - (a.risk+(100-a.ev)); })[0];
-  var avoid= list.slice().sort(function(a,b){
-    var A = a.risk*0.6 + (100-a.ev)*0.4, B = b.risk*0.6 + (100-b.ev)*0.4; return B-A; })[0];
-  return {best:best, low:low, unc:unc, avoid:avoid};
-}
 
+  /* Solo mercados con datos reales y señal RIS válida */
+  var v = list.filter(function(m){
+    return (
+      m.valido &&
+      m.market != null &&
+      m.ris != null &&
+      m.risk != null
+    );
+  });
+
+  if(!v.length) return null;
+
+  /* Mayor consistencia mercado vs modelo */
+  var best = v.slice().sort(function(a,b){
+    return b.cons - a.cons;
+  })[0];
+
+  /* Menor divergencia / riesgo calculado */
+  var low = v.slice().sort(function(a,b){
+    return a.risk - b.risk;
+  })[0];
+
+  /* Mayor incertidumbre */
+  var unc = v.slice().sort(function(a,b){
+    return (b.risk + (100-b.ev)) -
+           (a.risk + (100-a.ev));
+  })[0];
+
+  /* Mercado menos recomendable dentro de los que sí tienen señal */
+  var avoid = v.slice().sort(function(a,b){
+
+    var A =
+      a.risk * 0.6 +
+      (100-a.ev) * 0.4;
+
+    var B =
+      b.risk * 0.6 +
+      (100-b.ev) * 0.4;
+
+    return B-A;
+
+  })[0];
+
+  return {
+    best:best,
+    low:low,
+    unc:unc,
+    avoid:avoid
+  };
+}
 function riesgoPartido(p){
   var l = lectura(mercadosDe(p,'resumen'));
   if(!l) return 100;
@@ -1409,8 +1456,8 @@ async function cargarAnalisisPartido(p){
 
         p.m['btts'] = [
           Math.max(py,pn),
-          0,
-          50,
+          null,
+          null,
           35
         ];
       }
