@@ -1221,6 +1221,26 @@ async function cargarAnalisisPartido(p){
   'BLACK ROYAL · prediction response:',
   data
 );
+     const pred = data.response && data.response[0];
+
+if(pred && pred.teams){
+  const homeId = pred.teams.home.id;
+  const awayId = pred.teams.away.id;
+
+  const [resHome, resAway] = await Promise.all([
+    fetch('/.netlify/functions/api-football?endpoint=fixtures&team=' + homeId + '&last=10'),
+    fetch('/.netlify/functions/api-football?endpoint=fixtures&team=' + awayId + '&last=10')
+  ]);
+
+  const homeHistory = await resHome.json();
+  const awayHistory = await resAway.json();
+
+  p.historialHome = homeHistory;
+  p.historialAway = awayHistory;
+
+  console.log('BLACK ROYAL · Historial local:', homeHistory);
+  console.log('BLACK ROYAL · Historial visitante:', awayHistory);
+}
 
 
     /* ========================================
