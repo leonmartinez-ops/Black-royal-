@@ -450,7 +450,7 @@ input[type=range]::-webkit-slider-thumb{
     <div class="card">
       <div class="head"><h2>Procedencia de los datos</h2><span>honestidad</span></div>
       <p class="note">Equipos, fechas y horas de Liga MX y Leagues Cup: calendario público consultado el 8 ago 2026 — verifica contra la fuente oficial antes de decidir nada, los calendarios se mueven.</p>
-      <p class="note" style="margin-top:8px">Mercado: cuando existe fixtureId, Black Royal intenta cargar odds reales mediante la Netlify Function conectada a API-Football. 1X2 retira el margen del bookmaker; mercados no mutuamente excluyentes usan probabilidad implícita directa. Si falta modelo independiente, se muestra SIN EVIDENCIA — no se inventa.</p>
+      <p class="note" style="margin-top:8px">Mercado (1X2): en los partidos marcados, es probabilidad implícita real calculada a partir de momios públicos, con el margen de la casa retirado. Donde no hay momios todavía, el mercado se muestra SIN EVIDENCIA — no se inventa.</p>
       <p class="note" style="margin-top:8px"><b style="color:var(--text)">RIS y Riesgo siguen sin ser un modelo propio</b>: por ahora son una transformación simple y declarada del mercado, no una predicción independiente. Por eso la integridad general de estos partidos es baja a propósito.</p>
     </div>
 
@@ -469,7 +469,7 @@ input[type=range]::-webkit-slider-thumb{
       <button class="btn danger" id="reset" style="margin-top:14px">REINICIAR DEMO</button>
     </div>
 
-    <p class="foot">BLACK ROYAL · RIS MOBILE TERMINAL · DATA ENGINE v0.3<br>Fixtures reales de Liga MX y Leagues Cup. Mercado real donde hay momios; RIS/Riesgo aún no son un modelo propio. Prototipo educativo de visualización.</p>
+    <p class="foot">BLACK ROYAL · RIS MOBILE TERMINAL · PROTOTYPE v0.2<br>Fixtures reales de Liga MX y Leagues Cup. Mercado real donde hay momios; RIS/Riesgo aún no son un modelo propio. Prototipo educativo de visualización.</p>
   </section>
 
 </main>
@@ -584,8 +584,8 @@ var TORNEOS = [
   {
     id:'ligamx', liga:'LIGA MX', etiqueta:'Jornada 4 · Apertura 2026',
     partidos:[
-      {id:'mx1', fixtureId:1550921, local:'Atlante', visitante:'Deportivo Toluca', fecha:'15 ago', hora:'23:00',
-       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null), apiState:'idle'},
+      {id:'mx1', local:'Atlante', visitante:'Deportivo Toluca', fecha:'15 ago', hora:'23:00',
+       cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)},
       {id:'mx2', local:'Monterrey', visitante:'Juárez', fecha:'16 ago', hora:'01:00',
        cobertura:22, confianza:18, fuente:55, muestra:10, m:baseMercados(null)},
       {id:'mx3', local:'Atlas', visitante:'Tigres UANL', fecha:'16 ago', hora:'03:00',
@@ -692,9 +692,8 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 /* Aplica DEMO MODE sobre un partido sin tocar los datos originales. */
 function vista(p){
-  var d = S.demo, o = {id:p.id, fixtureId:p.fixtureId||null, local:p.local, visitante:p.visitante, hora:p.hora,
-    cobertura:p.cobertura, confianza:p.confianza, fuente:p.fuente, muestra:p.muestra,
-    apiState:p.apiState||'idle', apiSource:p.apiSource||'', apiError:p.apiError||'', m:{}};
+  var d = S.demo, o = {id:p.id, local:p.local, visitante:p.visitante, hora:p.hora,
+    cobertura:p.cobertura, confianza:p.confianza, fuente:p.fuente, muestra:p.muestra, m:{}};
   var f = {risk:1, ev:1, ris:1, cov:1, conf:1};
   if(d==='bajo')   f = {risk:.52, ev:1.22, ris:1.1,  cov:1.14, conf:1.2};
   if(d==='medio')  f = {risk:.86, ev:1.05, ris:1.0,  cov:1.02, conf:1.02};
@@ -706,8 +705,7 @@ function vista(p){
       Math.round(clamp(a[0],0,100)),
       Math.round(clamp(a[1]*f.ris,0,100)),
       Math.round(clamp(a[2]*f.risk,0,100)),
-      Math.round(clamp(a[3]*f.ev,0,100)),
-      a[4] ? Object.assign({}, a[4]) : null
+      Math.round(clamp(a[3]*f.ev,0,100))
     ];
   }
   o.cobertura = Math.round(clamp(p.cobertura*f.cov,0,100));
@@ -744,14 +742,11 @@ function mercadosDe(p, grupo){
     if(grupo==='resumen'){ if(S.visibles.indexOf(M.id)===-1) continue; }
     else if(M.grupo!==grupo) continue;
     var a = p.m[M.id]; if(!a) continue;
-    var ev = a[3], meta = a[4] || null;
-    var status = meta && meta.status ? meta.status : null;
-    var modelOk = status ? status !== 'SIN EVIDENCIA' : (ev >= UMBRAL_EVIDENCIA);
+    var ev = a[3];
     out.push({
       id:M.id, nombre:M.nombre, corto:M.corto,
-      market:a[0], ris:a[1], risk:a[2], ev:ev, meta:meta,
-      marketData: !!(meta && meta.marketData), status:status,
-      valido: modelOk && ev >= UMBRAL_EVIDENCIA,
+      market:a[0], ris:a[1], risk:a[2], ev:ev,
+      valido: ev >= UMBRAL_EVIDENCIA,
       /* consistencia: mercado y modelo apuntando igual, castigado por riesgo */
       cons: Math.round(Math.min(a[0],a[1]) - Math.abs(a[0]-a[1])*0.9 - a[2]*0.35)
     });
@@ -853,16 +848,15 @@ function drawChart(canvasId, list){
 
   var pend = [];
   list.forEach(function(m){
-    var hasMarket = m.valido || m.marketData;
     var g = el('div','grp'+(m.valido?'':' void'));
-    var b1 = el('div','bar '+(hasMarket?'market':'nodata'));
+    var b1 = el('div','bar '+(m.valido?'market':'nodata'));
     var b2 = el('div','bar '+(m.valido?'ris':'nodata'));
     var b3 = el('div','bar '+(m.valido?('risk'+(m.risk>=65?' hi':'')):'nodata'));
     g.appendChild(b1); g.appendChild(b2); g.appendChild(b3);
-    if(!m.valido) g.appendChild(el('div','void-tag',hasMarket?'SIN MODELO':'SIN DATOS'));
+    if(!m.valido) g.appendChild(el('div','void-tag','SIN DATOS'));
     g.appendChild(el('div','lbl', m.corto));
     c.appendChild(g);
-    pend.push([b1, hasMarket? m.market : 8]);
+    pend.push([b1, m.valido? m.market : 8]);
     pend.push([b2, m.valido? m.ris : 8]);
     pend.push([b3, m.valido? m.risk : 8]);
   });
@@ -872,9 +866,6 @@ function drawChart(canvasId, list){
 }
 
 function pillFor(m){
-  if(m.status==='ALINEADO') return '<div class="pill good">ALINEADO</div>';
-  if(m.status==='DIVERGENCIA') return '<div class="pill mid">DIVERGENCIA</div>';
-  if(m.status==='SIN EVIDENCIA') return '<div class="pill void">SIN EVIDENCIA</div>';
   if(!m.valido) return '<div class="pill void">SIN EVIDENCIA</div>';
   if(m.risk >= 65) return '<div class="pill bad">EVITAR</div>';
   if(m.cons >= 40 && m.risk < 45) return '<div class="pill good">CONSISTENTE</div>';
@@ -1159,183 +1150,60 @@ function renderRis(){
     : 'Safari está bloqueando el almacenamiento local en este contexto. La sesión funciona igual, pero se perderá al cerrar la pestaña.';
 }
 
-/* ============================================================
-   4B. DATA ENGINE — API-Football vía Netlify Function
-   El navegador nunca contiene la API key. Espera un endpoint que devuelva
-   predictions + odds para ?fixture=ID. Si tu función tiene otro nombre,
-   define window.BR_API_ENDPOINT antes de este script.
-   ============================================================ */
-var API_CACHE = {};
-var BR_API_CANDIDATES = [
-  window.BR_API_ENDPOINT || '',
-  '/.netlify/functions/api-football',
-  '/.netlify/functions/football',
-  '/.netlify/functions/black-royal'
-].filter(function(v,i,a){ return v && a.indexOf(v)===i; });
-
-function apiResponseArray(x){
-  if(!x) return [];
-  if(Array.isArray(x)) return x;
-  if(Array.isArray(x.response)) return x.response;
-  if(x.data && Array.isArray(x.data.response)) return x.data.response;
-  return [];
-}
-function getPredRoot(data){
-  var raw = data && (data.predictions || data.prediction || data.pred || null);
-  var a = apiResponseArray(raw);
-  if(a.length) return a[0];
-  if(raw && raw.predictions) return raw;
-  var direct = apiResponseArray(data);
-  return direct.length && direct[0].predictions ? direct[0] : null;
-}
-function getOddsRoot(data){
-  var raw = data && (data.odds || data.markets || null);
-  var a = apiResponseArray(raw);
-  if(a.length) return a[0];
-  if(raw && raw.bookmakers) return raw;
-  var direct = apiResponseArray(data);
-  for(var i=0;i<direct.length;i++) if(direct[i] && direct[i].bookmakers) return direct[i];
-  return null;
-}
-function numPct(v){
-  if(v==null) return null;
-  var n=parseFloat(String(v).replace('%','').trim());
-  return isNaN(n)?null:n;
-}
-function norm3(a,b,c){
-  var s=a+b+c; if(!s) return [0,0,0];
-  return [a/s*100,b/s*100,c/s*100];
-}
-function implied(odd){ var o=parseFloat(odd); return o>0 ? 100/o : null; }
-function normText(v){ return String(v||'').toLowerCase().replace(/[^a-z0-9.]+/g,' ').trim(); }
-function findBet(bookmaker, names){
-  if(!bookmaker || !bookmaker.bets) return null;
-  for(var i=0;i<bookmaker.bets.length;i++){
-    var n=normText(bookmaker.bets[i].name);
-    for(var j=0;j<names.length;j++) if(n.indexOf(names[j])>-1) return bookmaker.bets[i];
-  }
-  return null;
-}
-function valueOf(bet, aliases){
-  if(!bet || !bet.values) return null;
-  for(var i=0;i<bet.values.length;i++){
-    var n=normText(bet.values[i].value);
-    for(var j=0;j<aliases.length;j++) if(n===aliases[j] || n.indexOf(aliases[j])>-1) return bet.values[i];
-  }
-  return null;
-}
-function chooseBookmaker(root){
-  var bs=(root&&root.bookmakers)||[]; if(!bs.length) return null;
-  var best=bs[0], bestScore=-1;
-  bs.forEach(function(b){
-    var score=0;
-    if(findBet(b,['match winner','1x2'])) score+=4;
-    if(findBet(b,['double chance'])) score+=3;
-    if(findBet(b,['goals over under','over under'])) score+=2;
-    if(findBet(b,['both teams score','both teams to score'])) score+=1;
-    if(score>bestScore){ best=b; bestScore=score; }
-  });
-  return best;
-}
-function alignment(marketPct, modelPct){
-  if(marketPct==null || modelPct==null) return 'SIN EVIDENCIA';
-  return Math.abs(marketPct-modelPct) <= 10 ? 'ALINEADO' : 'DIVERGENCIA';
-}
-function packMarket(marketPct, modelPct, selection, odds, bookmaker){
-  var st=alignment(marketPct,modelPct);
-  var div=modelPct==null?100:Math.abs(marketPct-modelPct);
-  var risk=modelPct==null?100:Math.round(clamp(35+div*1.4,20,90));
-  return [Math.round(marketPct||0), Math.round(modelPct||0), risk, modelPct==null?30:92, {
-    status:st, marketData:true, selection:selection||'', odds:odds==null?null:parseFloat(odds), bookmaker:bookmaker||''
-  }];
-}
-function aplicarDatosAPI(p,data,source){
-  var pr=getPredRoot(data), oroot=getOddsRoot(data);
-  if(!oroot) throw new Error('La respuesta no contiene bookmakers/odds');
-  var book=chooseBookmaker(oroot);
-  if(!book) throw new Error('No hay bookmakers en la respuesta');
-  var bname=book.name||'bookmaker';
-
-  var win=findBet(book,['match winner','1x2']);
-  var vh=valueOf(win,['home','1']); var vd=valueOf(win,['draw','x']); var va=valueOf(win,['away','2']);
-  var ph=null,pd=null,pa=null;
-  if(vh&&vd&&va){ var nn=norm3(implied(vh.odd),implied(vd.odd),implied(va.odd)); ph=nn[0];pd=nn[1];pa=nn[2]; }
-
-  var pp=pr&&pr.predictions&&pr.predictions.percent ? pr.predictions.percent : (pr&&pr.percent?pr.percent:null);
-  var mh=pp?numPct(pp.home):null, md=pp?numPct(pp.draw):null, ma=pp?numPct(pp.away):null;
-  if(ph!=null){
-    var marketVals=[ph,pd,pa], modelVals=[mh,md,ma], labels=['1','X','2'], odds=[vh.odd,vd.odd,va.odd];
-    var idx=0; for(var i=1;i<3;i++) if(marketVals[i]>marketVals[idx]) idx=i;
-    p.m['1x2']=packMarket(marketVals[idx],modelVals[idx],labels[idx],odds[idx],bname);
-  }
-
-  var dc=findBet(book,['double chance']);
-  if(dc){
-    var d1=valueOf(dc,['home draw','1x']); var d12=valueOf(dc,['home away','12']); var dx2=valueOf(dc,['draw away','x2']);
-    var opts=[];
-    if(d1) opts.push({sel:'1X',o:d1.odd,mp:implied(d1.odd),rp:(mh!=null&&md!=null)?mh+md:null});
-    if(d12) opts.push({sel:'12',o:d12.odd,mp:implied(d12.odd),rp:(mh!=null&&ma!=null)?mh+ma:null});
-    if(dx2) opts.push({sel:'X2',o:dx2.odd,mp:implied(dx2.odd),rp:(md!=null&&ma!=null)?md+ma:null});
-    if(opts.length){ opts.sort(function(a,b){return b.mp-a.mp;}); var z=opts[0]; p.m['dc']=packMarket(z.mp,z.rp,z.sel,z.o,bname); }
-  }
-
-  var ou=findBet(book,['goals over under','over under']);
-  if(ou){
-    var ov=valueOf(ou,['over 2.5']); var un=valueOf(ou,['under 2.5']);
-    if(ov||un){
-      var cand=[]; if(ov)cand.push({sel:'OVER 2.5',o:ov.odd,mp:implied(ov.odd)}); if(un)cand.push({sel:'UNDER 2.5',o:un.odd,mp:implied(un.odd)});
-      cand.sort(function(a,b){return b.mp-a.mp;}); var z2=cand[0]; p.m['ou25']=packMarket(z2.mp,null,z2.sel,z2.o,bname);
-    }
-  }
-
-  var bt=findBet(book,['both teams score','both teams to score']);
-  if(bt){
-    var yes=valueOf(bt,['yes']); var no=valueOf(bt,['no']);
-    if(yes||no){
-      var bc=[]; if(yes)bc.push({sel:'BTTS YES',o:yes.odd,mp:implied(yes.odd)}); if(no)bc.push({sel:'BTTS NO',o:no.odd,mp:implied(no.odd)});
-      bc.sort(function(a,b){return b.mp-a.mp;}); var z3=bc[0]; p.m['btts']=packMarket(z3.mp,null,z3.sel,z3.o,bname);
-    }
-  }
-
-  p.cobertura = Math.max(p.cobertura, 72);
-  p.confianza = (mh!=null&&md!=null&&ma!=null) ? 68 : Math.max(p.confianza,42);
-  p.fuente = 95;
-  p.muestra = Math.max(p.muestra, 45);
-  p.apiState='ok'; p.apiSource=source||bname; p.apiError='';
-  API_CACHE[p.fixtureId]={ok:true};
-}
-async function cargarAnalisisPartido(p){
-  if(!p || !p.fixtureId || p.apiState==='ok' || p.apiState==='loading') return;
-  p.apiState='loading'; p.apiError='';
-  if(S.sel===p.id && $('sheet').classList.contains('on')) renderSheet();
-  var last='Endpoint no disponible';
-  for(var i=0;i<BR_API_CANDIDATES.length;i++){
-    var base=BR_API_CANDIDATES[i];
-    try{
-      var sep=base.indexOf('?')>-1?'&':'?';
-      var url=base+sep+'fixture='+encodeURIComponent(p.fixtureId)+'&fixtureId='+encodeURIComponent(p.fixtureId);
-      var res=await fetch(url,{headers:{'Accept':'application/json'}});
-      if(!res.ok){ last='HTTP '+res.status+' en '+base; continue; }
-      var data=await res.json();
-      aplicarDatosAPI(p,data,base);
-      renderAll();
-      if($('sheet').classList.contains('on') && S.sel===p.id) renderSheet();
-      return;
-    }catch(e){ last=e&&e.message?e.message:String(e); }
-  }
-  p.apiState='error'; p.apiError=last;
-  API_CACHE[p.fixtureId]={ok:false,error:last};
-  if($('sheet').classList.contains('on') && S.sel===p.id) renderSheet();
-}
-
 /* ---------- DETALLE ---------- */
+async function cargarAnalisisPartido(p){
+  if(!p || !p.fixtureId) return;
+
+  try{
+    const res = await fetch(
+      '/.netlify/functions/api-football?endpoint=predictions&fixture=' + p.fixtureId
+    );
+
+    const data = await res.json();
+
+    console.log(
+      'BLACK ROYAL · Análisis fixture ' + p.fixtureId + ':',
+      data
+    );
+
+    p.apiAnalisis = data;
+    window.BLACK_ROYAL_PARTIDO_API = data;
+
+     const resOdds = await fetch(
+  '/.netlify/functions/api-football?endpoint=odds&fixture=' + p.fixtureId
+);
+
+const oddsData = await resOdds.json();
+
+console.log(
+  'BLACK ROYAL · Odds fixture ' + p.fixtureId + ':',
+  oddsData
+);
+
+p.apiOdds = oddsData;
+window.BLACK_ROYAL_ODDS_API = oddsData;
+
+  }catch(error){
+    console.error(
+      'Error cargando análisis del partido:',
+      error
+    );
+  }
+}
 function openSheet(id){
-  S.sel = id; save();
+  S.sel = id;
+  save();
+
+  var p = getPartido(id);
+
+  if(p && p.fixtureId){
+    cargarAnalisisPartido(p);
+  }
+
   renderSheet();
   $('sheet').classList.add('on');
   document.body.style.overflow='hidden';
   $('sheet').scrollTop = 0;
-  cargarAnalisisPartido(getPartido(id));
 }
 function closeSheet(){
   $('sheet').classList.remove('on');
@@ -1347,17 +1215,9 @@ function renderSheet(){
   var p = vista(getPartido(S.sel));
   var st = estado(p);
   $('d-teams').innerHTML = p.local + '<i>vs</i>' + p.visitante;
-  var apiBadge = '';
-  if(p.fixtureId){
-    if(p.apiState==='loading') apiBadge='<div class="pill info">CARGANDO API…</div>';
-    else if(p.apiState==='ok') apiBadge='<div class="pill good">API REAL · #'+p.fixtureId+'</div>';
-    else if(p.apiState==='error') apiBadge='<div class="pill bad">API SIN CONEXIÓN</div>';
-    else apiBadge='<div class="pill info">FIXTURE #'+p.fixtureId+'</div>';
-  }
   $('d-meta').innerHTML =
-    '<div class="pill info">'+p.hora+'</div>'+ 
-    '<div class="pill '+(st.t==='ANALIZADO'?'good':st.t==='DATOS PARCIALES'?'mid':'bad')+'">'+st.t+'</div>'+ 
-    apiBadge+
+    '<div class="pill info">'+p.hora+'</div>'+
+    '<div class="pill '+(st.t==='ANALIZADO'?'good':st.t==='DATOS PARCIALES'?'mid':'bad')+'">'+st.t+'</div>'+
     '<div class="pill void">MUESTRA '+p.muestra+'</div>';
 
   var tabs = $('d-tabs'); tabs.innerHTML='';
@@ -1374,10 +1234,9 @@ function renderSheet(){
   drawRead('d-read', list, i.ok);
   drawRows('d-rows', list);
   drawIntegrity('d', p);
-  var apiTxt = p.apiState==='ok' ? ' · API-Football vía '+p.apiSource : (p.apiState==='error' ? ' · Error API: '+p.apiError : '');
   $('d-scoretxt').innerHTML = i.ok
-    ? 'Cobertura '+p.cobertura+' · confianza '+p.confianza+' · fuente '+p.fuente+' · muestra '+p.muestra+' observaciones'+apiTxt+'.'
-    : 'Datos insuficientes: cobertura '+p.cobertura+' y muestra '+p.muestra+'. Sin señal emitida'+apiTxt+'.';
+    ? 'Cobertura '+p.cobertura+' · confianza '+p.confianza+' · fuente '+p.fuente+' · muestra '+p.muestra+' observaciones.'
+    : 'Datos insuficientes: cobertura '+p.cobertura+' y muestra '+p.muestra+'. Sin señal emitida.';
 
   var on = S.activos.indexOf(p.id)>-1;
   $('d-add').innerHTML = on ? 'QUITAR DEL SIMULADOR' : 'AÑADIR AL SIMULADOR';
@@ -1466,6 +1325,75 @@ $('reset').onclick = function(){
 /* ============================================================
    6. ARRANQUE
    ============================================================ */
+async function cargarLigaMX(){
+  try{
+    const res = await fetch('/.netlify/functions/api-football?league=262&season=2026&next=10');
+    const data = await res.json();
+
+    console.log('BLACK ROYAL · Liga MX API:', data);
+    window.BLACK_ROYAL_API = data;
+
+    if(data.response && data.response.length){
+
+      const rondaActual = data.response[0].league.round;
+
+      const partidosJornada = data.response.filter(
+        p => p.league.round === rondaActual
+      );
+
+      TORNEOS[0].partidos = partidosJornada.map((p, i) => {
+
+        const fecha = new Date(p.fixture.date);
+
+        return {
+  id: 'api-' + p.fixture.id,
+  identificacion: 'api-' + p.fixture.id,
+  fixtureId: p.fixture.id,
+           
+          local: p.teams.home.name,
+          visitante: p.teams.away.name,
+
+          logoLocal: p.teams.home.logo,
+          logoVisitante: p.teams.away.logo,
+
+          fecha: fecha.toLocaleDateString('es-MX', {
+            day:'2-digit',
+            month:'short',
+            year:'numeric',
+            timeZone:'America/Mexico_City'
+          }),
+
+          hora: fecha.toLocaleTimeString('es-MX', {
+            hour:'2-digit',
+            minute:'2-digit',
+            hour12:false,
+            timeZone:'America/Mexico_City'
+          }),
+
+          cobertura: 0,
+          confianza: 0,
+          fuente: 100,
+          muestra: 0,
+
+          metro: baseMercados(null)
+        };
+      });
+
+      console.log(
+        'BLACK ROYAL · Jornada cargada:',
+        rondaActual,
+        TORNEOS[0].partidos
+      );
+
+      renderAll();
+    }
+
+  }catch(error){
+    console.error('Error cargando Liga MX:', error);
+  }
+}
+
+cargarLigaMX();
 renderAll();
 setVista(S.vista || 'terminal');
 </script>
