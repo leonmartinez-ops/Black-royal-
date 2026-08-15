@@ -1472,7 +1472,85 @@ async function cargarAnalisisPartido(p){
     p.cobertura = 75;
     p.confianza = 65;
     p.fuente = 90;
-    p.muestra = 1;
+    // MUESTRA HISTÓRICA REAL
+const rootPrediction =
+  data &&
+  data.response &&
+  data.response[0];
+
+const homeTeamId =
+  rootPrediction &&
+  rootPrediction.teams &&
+  rootPrediction.teams.home
+    ? rootPrediction.teams.home.id
+    : null;
+
+const awayTeamId =
+  rootPrediction &&
+  rootPrediction.teams &&
+  rootPrediction.teams.away
+    ? rootPrediction.teams.away.id
+    : null;
+
+let historialHome = [];
+let historialAway = [];
+
+if(homeTeamId && awayTeamId){
+
+  const [resHomeHistory, resAwayHistory] = await Promise.all([
+    fetch(
+      '/.netlify/functions/api-football?endpoint=fixtures&team=' +
+      homeTeamId +
+      '&last=50'
+    ),
+    fetch(
+      '/.netlify/functions/api-football?endpoint=fixtures&team=' +
+      awayTeamId +
+      '&last=50'
+    )
+  ]);
+
+  const homeHistoryData = await resHomeHistory.json();
+  const awayHistoryData = await resAwayHistory.json();
+
+  historialHome =
+    homeHistoryData && homeHistoryData.response
+      ? homeHistoryData.response
+      : [];
+
+  historialAway =
+    awayHistoryData && awayHistoryData.response
+      ? awayHistoryData.response
+      : [];
+
+  p.historialHome = historialHome;
+  p.historialAway = historialAway;
+
+  const fixtureIds = {};
+
+  historialHome.forEach(function(match){
+    if(match.fixture && match.fixture.id){
+      fixtureIds[match.fixture.id] = true;
+    }
+  });
+
+  historialAway.forEach(function(match){
+    if(match.fixture && match.fixture.id){
+      fixtureIds[match.fixture.id] = true;
+    }
+  });
+
+  p.muestra = Object.keys(fixtureIds).length;
+
+}else{
+
+  p.muestra = 0;
+}
+
+console.log(
+  'BLACK ROYAL · Muestra histórica real:',
+  p.muestra
+);
 
 
     console.log(
