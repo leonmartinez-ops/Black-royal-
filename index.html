@@ -967,7 +967,14 @@ function drawRows(nodeId, list){
   list.forEach(function(m){
     var r = el('div','row');
     r.innerHTML =
-      '<div class="nm"><b>'+m.nombre+'</b><small>Evidencia '+m.ev+'% · muestra '+(m.valido?'suficiente':'insuficiente')+'</small></div>'+
+      '<div class="nm"><b>'+m.nombre+'</b><small>'+
+'Evidencia '+m.ev+'% · '+
+(m.id==='cor'
+  ? 'U/O '+(getPartido(S.sel).cornerLine!=null ? getPartido(S.sel).cornerLine : '—')+
+    ' · muestra '+(getPartido(S.sel).cornerSample || 0)+' partidos'
+  : 'muestra '+(m.valido?'suficiente':'insuficiente')
+)+
+'</small></div>'+
       (m.valido
         ? '<div class="nums"><div class="num m">'+m.market+'</div><div class="num s">'+m.ris+'</div><div class="num k">'+m.risk+'</div></div>'
         : '<div class="nums"><div class="num" style="color:#6a6e74">—</div></div>')+
