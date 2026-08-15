@@ -1541,6 +1541,80 @@ if(homeTeamId && awayTeamId){
   });
 
   p.muestra = Object.keys(fixtureIds).length;
+   // ========================================
+// RIS · SEÑALES HISTÓRICAS DE GOLES
+// ========================================
+
+const historialTotal = Object.values(
+  historialHome.concat(historialAway).reduce(function(acc, match){
+    if(match && match.fixture && match.fixture.id){
+      acc[match.fixture.id] = match;
+    }
+    return acc;
+  }, {})
+);
+
+let validos = 0;
+let over15 = 0;
+let over25 = 0;
+let bttsSi = 0;
+
+historialTotal.forEach(function(match){
+
+  if(
+    !match ||
+    !match.goals ||
+    match.goals.home === null ||
+    match.goals.away === null
+  ){
+    return;
+  }
+
+  const golesHome = Number(match.goals.home);
+  const golesAway = Number(match.goals.away);
+  const totalGoles = golesHome + golesAway;
+
+  validos++;
+
+  if(totalGoles >= 2){
+    over15++;
+  }
+
+  if(totalGoles >= 3){
+    over25++;
+  }
+
+  if(golesHome > 0 && golesAway > 0){
+    bttsSi++;
+  }
+});
+
+const risOver15 =
+  validos > 0
+    ? Math.round((over15 / validos) * 100)
+    : null;
+
+const risOver25 =
+  validos > 0
+    ? Math.round((over25 / validos) * 100)
+    : null;
+
+const risBTTS =
+  validos > 0
+    ? Math.round((bttsSi / validos) * 100)
+    : null;
+
+p.risHistorico = {
+  muestra: validos,
+  over15: risOver15,
+  over25: risOver25,
+  btts: risBTTS
+};
+
+console.log(
+  'BLACK ROYAL · Señales históricas RIS:',
+  p.risHistorico
+);
 
 }else{
 
