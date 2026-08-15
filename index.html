@@ -1769,7 +1769,167 @@ try{
 
     p.cornerSample = historicoCorners.length;
     p.historicoCorners = historicoCorners;
+// ========================================
+// CONECTAR CORNERS HISTÓRICOS AL MERCADO
+// ========================================
 
+const cornerBet = bets.find(function(b){
+  return (
+    b &&
+    /corner/i.test(b.name || '') &&
+    Array.isArray(b.values)
+  );
+});
+
+if(
+  cornerBet &&
+  p.cornerSample >= 6
+){
+
+  const lineasCorner = {};
+
+  cornerBet.values.forEach(function(v){
+
+    const texto = String(v.value || '');
+
+    const matchLinea =
+      texto.match(/^(Over|Under)\s+([0-9.]+)/i);
+
+    if(!matchLinea){
+      return;
+    }
+
+    const lado =
+      matchLinea[1].toLowerCase();
+
+    const linea =
+      parseFloat(matchLinea[2]);
+
+    if(!lineasCorner[linea]){
+      lineasCorner[linea] = {};
+    }
+
+    lineasCorner[linea][lado] = v;
+
+  });
+
+  const lineasValidas =
+    Object.keys(lineasCorner)
+      .map(Number)
+      .filter(function(linea){
+
+        return (
+          lineasCorner[linea].over &&
+          lineasCorner[linea].under
+        );
+
+      });
+
+  let mejorLinea = null;
+  let menorGap = Infinity;
+
+  lineasValidas.forEach(function(linea){
+
+    const pOver =
+      probCuota(
+        lineasCorner[linea].over.odd
+      );
+
+    const pUnder =
+      probCuota(
+        lineasCorner[linea].under.odd
+      );
+
+    const gap =
+      Math.abs(pOver - pUnder);
+
+    if(gap < menorGap){
+      menorGap = gap;
+      mejorLinea = linea;
+    }
+
+  });
+
+  if(mejorLinea !== null){
+
+    const pOver =
+      probCuota(
+        lineasCorner[mejorLinea].over.odd
+      );
+
+    const pUnder =
+      probCuota(
+        lineasCorner[mejorLinea].under.odd
+      );
+
+    const ladoMercado =
+      pOver >= pUnder
+        ? 'over'
+        : 'under';
+
+    const mercadoCorner =
+      ladoMercado === 'over'
+        ? pOver
+        : pUnder;
+
+    let overHistorico = 0;
+
+    historicoCorners.forEach(function(total){
+
+      if(total > mejorLinea){
+        overHistorico++;
+      }
+
+    });
+
+    const risOverCorner =
+      Math.round(
+        (
+          overHistorico /
+          historicoCorners.length
+        ) * 100
+      );
+
+    const risCorner =
+      ladoMercado === 'over'
+        ? risOverCorner
+        : 100 - risOverCorner;
+
+    const evidenciaCorner =
+      Math.min(
+        95,
+        45 + (p.cornerSample * 4)
+      );
+
+    p.cornerLine = mejorLinea;
+    p.cornerSide = ladoMercado;
+
+    p.m['cor'] = [
+      mercadoCorner,
+      risCorner,
+      Math.abs(
+        mercadoCorner - risCorner
+      ),
+      evidenciaCorner
+    ];
+
+    console.log(
+      'BLACK ROYAL · CORNERS RIS:',
+      {
+        linea: mejorLinea,
+        lado: ladoMercado,
+        mercado: mercadoCorner,
+        ris: risCorner,
+        riesgo: Math.abs(
+          mercadoCorner - risCorner
+        ),
+        muestra: p.cornerSample
+      }
+    );
+
+  }
+
+}
     console.log(
       'BLACK ROYAL · Histórico corners:',
       historicoCorners
