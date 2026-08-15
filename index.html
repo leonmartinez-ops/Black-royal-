@@ -1425,7 +1425,7 @@ async function cargarAnalisisPartido(p){
           modeloOU = lado;
           evidenciaOU = 70;
         }
-
+p.ou25Side = pOver >= pUnder ? 'over' : 'under';
         p.m['ou25'] = [
           lado,
           modeloOU,
@@ -1454,7 +1454,7 @@ async function cargarAnalisisPartido(p){
 
         const py = probCuota(yes.odd);
         const pn = probCuota(no.odd);
-
+p.bttsSide = py >= pn ? 'yes' : 'no';
         p.m['btts'] = [
           Math.max(py,pn),
           null,
