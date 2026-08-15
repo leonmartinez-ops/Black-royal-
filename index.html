@@ -1682,7 +1682,114 @@ if(p.m['btts'] && risBTTS !== null){
   );
   p.m['btts'][3] = 90;
 }
-   
+// ========================================
+// CORNERS RIS V1
+// ========================================
+
+try{
+
+  const cornerIds = [];
+
+  historialHome.slice(0,6)
+    .concat(historialAway.slice(0,6))
+    .forEach(function(match){
+
+      const id =
+        match &&
+        match.fixture &&
+        match.fixture.id;
+
+      if(id && cornerIds.indexOf(id) === -1){
+        cornerIds.push(id);
+      }
+
+    });
+
+  const idsCorners = cornerIds.slice(0,12);
+
+  if(idsCorners.length){
+
+    const resCorners = await fetch(
+      '/.netlify/functions/api-football?endpoint=fixtures&ids=' +
+      idsCorners.join('-')
+    );
+
+    const dataCorners = await resCorners.json();
+
+    const fixturesCorners =
+      dataCorners &&
+      Array.isArray(dataCorners.response)
+        ? dataCorners.response
+        : [];
+
+    const historicoCorners = [];
+
+    fixturesCorners.forEach(function(fixture){
+
+      if(
+        !fixture ||
+        !Array.isArray(fixture.statistics)
+      ){
+        return;
+      }
+
+      let totalCorners = 0;
+      let equiposConDato = 0;
+
+      fixture.statistics.forEach(function(teamStats){
+
+        if(
+          !teamStats ||
+          !Array.isArray(teamStats.statistics)
+        ){
+          return;
+        }
+
+        const cornerStat =
+          teamStats.statistics.find(function(stat){
+            return stat.type === 'Corner Kicks';
+          });
+
+        if(
+          cornerStat &&
+          cornerStat.value !== null &&
+          cornerStat.value !== undefined
+        ){
+          totalCorners += Number(cornerStat.value) || 0;
+          equiposConDato++;
+        }
+
+      });
+
+      if(equiposConDato === 2){
+        historicoCorners.push(totalCorners);
+      }
+
+    });
+
+    p.cornerSample = historicoCorners.length;
+    p.historicoCorners = historicoCorners;
+
+    console.log(
+      'BLACK ROYAL · Histórico corners:',
+      historicoCorners
+    );
+
+    console.log(
+      'BLACK ROYAL · Muestra corners:',
+      p.cornerSample
+    );
+
+  }
+
+}catch(cornerError){
+
+  console.warn(
+    'BLACK ROYAL · Error cargando corners:',
+    cornerError
+  );
+
+}
 
 }else{
 
