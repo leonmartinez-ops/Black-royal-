@@ -1615,7 +1615,37 @@ console.log(
   'BLACK ROYAL · Señales históricas RIS:',
   p.risHistorico
 );
+// ========================================
+// CONECTAR HISTÓRICO RIS A MERCADOS
+// ========================================
 
+if(p.m['ou25'] && risOver25 !== null){
+
+  const risOU25 =
+    p.ou25Side === 'over'
+      ? risOver25
+      : 100 - risOver25;
+
+  p.m['ou25'][1] = risOU25;
+  p.m['ou25'][2] = Math.abs(
+    p.m['ou25'][0] - risOU25
+  );
+  p.m['ou25'][3] = 90;
+}
+
+if(p.m['btts'] && risBTTS !== null){
+
+  const risBTTSMercado =
+    p.bttsSide === 'yes'
+      ? risBTTS
+      : 100 - risBTTS;
+
+  p.m['btts'][1] = risBTTSMercado;
+  p.m['btts'][2] = Math.abs(
+    p.m['btts'][0] - risBTTSMercado
+  );
+  p.m['btts'][3] = 90;
+}
 }else{
 
   p.muestra = 0;
