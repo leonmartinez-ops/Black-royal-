@@ -669,12 +669,16 @@ var DEFAULT_STATE = {
   demo:'real',
   activos:[],              // ids de partidos en el simulador
   exposicion:{},           // id -> % de banca
+  analysisByFixture:{},    // fixtureId -> snapshot RIS compartido y persistente
   visibles:['1x2','dc','btts','ou25','cor','dcg']
 };
 
 var S = Object.assign({}, DEFAULT_STATE);
 var saved = load();
 if(saved){ S = Object.assign({}, DEFAULT_STATE, saved); }
+if(!S.analysisByFixture || typeof S.analysisByFixture !== 'object'){
+  S.analysisByFixture = {};
+}
 var torneoIdx = clampInt(S.torneo||0, 0, TORNEOS.length-1);
 function clampInt(v,a,b){ return Math.max(a,Math.min(b,v|0)); }
 
@@ -690,6 +694,48 @@ function getPartido(id){
   return TORNEOS[0].partidos[0];
 }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* Un único snapshot normalizado por fixture alimenta Terminal, Gráficas,
+   Jornada, RIS y el detalle, incluso después de recargar la página. */
+var ANALYSIS_FIELDS = [
+  'm','cobertura','confianza','fuente','muestra','risHistorico',
+  'ou15Side','ou25Side','bttsSide','cornerLine','cornerSide',
+  'cornerSample','historicoCorners'
+];
+function fixtureKey(p){
+  return p && p.fixtureId != null ? String(p.fixtureId) : null;
+}
+function applyAnalysisSnapshot(p){
+  var key = fixtureKey(p);
+  var snapshot = key && S.analysisByFixture[key];
+  if(!snapshot) return false;
+  ANALYSIS_FIELDS.forEach(function(field){
+    if(Object.prototype.hasOwnProperty.call(snapshot, field)){
+      p[field] = snapshot[field];
+    }
+  });
+  p.analysisStatus = snapshot.analysisStatus || 'complete';
+  p.analyzedAt = snapshot.analyzedAt || null;
+  return true;
+}
+function persistAnalysisSnapshot(p){
+  var key = fixtureKey(p);
+  if(!key) return;
+  var snapshot = {
+    fixtureId:p.fixtureId,
+    analysisStatus:'complete',
+    analyzedAt:new Date().toISOString()
+  };
+  ANALYSIS_FIELDS.forEach(function(field){
+    if(Object.prototype.hasOwnProperty.call(p, field)){
+      snapshot[field] = p[field];
+    }
+  });
+  S.analysisByFixture[key] = snapshot;
+  p.analysisStatus = snapshot.analysisStatus;
+  p.analyzedAt = snapshot.analyzedAt;
+  save();
+}
 
 /* Aplica DEMO MODE sobre un partido sin tocar los datos originales. */
 function vista(p){
@@ -1232,6 +1278,12 @@ function renderRis(){
 /* ---------- DETALLE ---------- */
 async function cargarAnalisisPartido(p){
   if(!p || !p.fixtureId) return;
+
+  if(applyAnalysisSnapshot(p)){
+    renderSheet();
+    renderAll();
+    return;
+  }
 
   try{
 
@@ -2031,6 +2083,7 @@ console.log(
        9. REDIBUJAR BLACK ROYAL
     ======================================== */
 
+    persistAnalysisSnapshot(p);
     renderSheet();
     renderAll();
 
@@ -2230,6 +2283,10 @@ async function cargarLigaMX(){
 
 m: baseMercados(null)
         };
+      });
+
+      TORNEOS[0].partidos.forEach(function(partido){
+        applyAnalysisSnapshot(partido);
       });
 
       console.log(
