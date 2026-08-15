@@ -1773,13 +1773,38 @@ try{
 // CONECTAR CORNERS HISTÓRICOS AL MERCADO
 // ========================================
 
-const cornerBet = bets.find(function(b){
-  return (
-    b &&
-    /corner/i.test(b.name || '') &&
-    Array.isArray(b.values)
-  );
-});
+const cornerBet = (() => {
+
+  if(!Array.isArray(bookmakers)){
+    return null;
+  }
+
+  for(const book of bookmakers){
+
+    if(!book || !Array.isArray(book.bets)){
+      continue;
+    }
+
+    const encontrado =
+      book.bets.find(function(b){
+
+        return (
+          b &&
+          /corner/i.test(b.name || '') &&
+          Array.isArray(b.values)
+        );
+
+      });
+
+    if(encontrado){
+      return encontrado;
+    }
+
+  }
+
+  return null;
+
+})();
 
 if(
   cornerBet &&
