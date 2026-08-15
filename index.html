@@ -919,7 +919,7 @@ function pillFor(m){
 
 function drawRead(nodeId, list, ok){
   var n = $(nodeId); n.innerHTML='';
-   var p = vista(getPartido(S.sel));
+   var p = getPartido(S.sel);
   var l = lectura(list);
   if(!ok || !l){
     n.innerHTML = '<div style="grid-column:1/-1" class="r"><span>Lectura del modelo</span><b>NO HAY SUFICIENTE INFORMACIÓN</b></div>';
