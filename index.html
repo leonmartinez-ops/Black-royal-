@@ -540,6 +540,7 @@ var MERCADOS = [
   {id:'h1',   nombre:'Primera mitad',        corto:'1ª MITAD', grupo:'resultado'},
   {id:'h2',   nombre:'Segunda mitad',        corto:'2ª MITAD', grupo:'resultado'},
   {id:'btts', nombre:'Ambos equipos anotan', corto:'BTTS',     grupo:'goles'},
+ {id:'ou15', nombre:'Over / Under 1.5', corto:'U/O 1.5', grupo:'goles'},
   {id:'ou25', nombre:'Over / Under 2.5',     corto:'U/O 2.5',  grupo:'goles'},
   {id:'tot',  nombre:'Total de goles',       corto:'TOTAL',    grupo:'goles'},
   {id:'cor',  nombre:'Córners',              corto:'CÓRNERS',  grupo:'corners'},
@@ -562,7 +563,7 @@ var GRUPOS = [
    evidencia baja (6) hasta que se consigan momios reales para ellos también: el sistema
    los mostrará como SIN EVIDENCIA en vez de inventar un número. */
 function baseMercados(x2){
-  var ids = ['1x2','dc','h1','h2','btts','ou25','tot','cor','tar','rou','dcg'];
+  var ids = ['1x2','dc','h1','h2','btts','ou15','ou25','tot','cor','tar','rou','dcg'];
   var out = {};
  ids.forEach(function(id){ out[id] = [null,null,null,6]; });
   if(x2) out['1x2'] = x2;
@@ -701,12 +702,12 @@ function vista(p){
   if(d==='nodata') f = {risk:1.7,  ev:.22, ris:.45,  cov:.32, conf:.24};
   for(var k in p.m){
     var a = p.m[k];
-    o.m[k] = [
-      Math.round(clamp(a[0],0,100)),
-      Math.round(clamp(a[1]*f.ris,0,100)),
-      Math.round(clamp(a[2]*f.risk,0,100)),
-      Math.round(clamp(a[3]*f.ev,0,100))
-    ];
+  o.m[k] = [
+  a[0] == null ? null : Math.round(clamp(a[0],0,100)),
+  a[1] == null ? null : Math.round(clamp(a[1]*f.ris,0,100)),
+  a[2] == null ? null : Math.round(clamp(a[2]*f.risk,0,100)),
+  a[3] == null ? 0 : Math.round(clamp(a[3]*f.ev,0,100))
+];
   }
   o.cobertura = Math.round(clamp(p.cobertura*f.cov,0,100));
   o.confianza = Math.round(clamp(p.confianza*f.conf,0,100));
@@ -1618,7 +1619,42 @@ console.log(
 // ========================================
 // CONECTAR HISTÓRICO RIS A MERCADOS
 // ========================================
+// U/O 1.5 · MERCADO REAL + HISTÓRICO RIS
+if(ou && risOver15 !== null){
 
+  const over15Odd = buscarValor(ou,'Over 1.5');
+  const under15Odd = buscarValor(ou,'Under 1.5');
+
+  if(over15Odd && under15Odd){
+
+    const mercadoOver15 = probCuota(over15Odd.odd);
+    const mercadoUnder15 = probCuota(under15Odd.odd);
+
+    const ladoOver15 =
+      mercadoOver15 >= mercadoUnder15
+        ? 'over'
+        : 'under';
+
+    const mercadoOU15 =
+      ladoOver15 === 'over'
+        ? mercadoOver15
+        : mercadoUnder15;
+
+    const risOU15 =
+      ladoOver15 === 'over'
+        ? risOver15
+        : 100 - risOver15;
+
+    p.ou15Side = ladoOver15;
+
+    p.m['ou15'] = [
+      mercadoOU15,
+      risOU15,
+      Math.abs(mercadoOU15 - risOU15),
+      90
+    ];
+  }
+}
 if(p.m['ou25'] && risOver25 !== null){
 
   const risOU25 =
@@ -1646,6 +1682,8 @@ if(p.m['btts'] && risBTTS !== null){
   );
   p.m['btts'][3] = 90;
 }
+   
+
 }else{
 
   p.muestra = 0;
@@ -1864,7 +1902,7 @@ async function cargarLigaMX(){
           fuente: 100,
           muestra: 0,
 
-          metro: baseMercados(null)
+m: baseMercados(null)
         };
       });
 
