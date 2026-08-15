@@ -1237,15 +1237,7 @@ if(pred && pred.teams){
 
   p.historialHome = homeHistory;
   p.historialAway = awayHistory;
-const homeMatches = homeHistory.response || [];
-const awayMatches = awayHistory.response || [];
 
-p.muestra = homeMatches.length + awayMatches.length;
-
-console.log(
-  'BLACK ROYAL · Muestra histórica:',
-  p.muestra
-);
   console.log('BLACK ROYAL · Historial local:', homeHistory);
   console.log('BLACK ROYAL · Historial visitante:', awayHistory);
 }
