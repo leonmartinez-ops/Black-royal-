@@ -945,7 +945,7 @@ function drawRead(nodeId, list, ok){
       'div',
       'g',
       '<span>Línea analizada</span>' +
-      '<b>U/O ' + p.cornerLine + '</b>'
+      '<b>' + (p.cornerSide === 'over' ? 'OVER ' : 'UNDER ') + p.cornerLine + '</b>'
     )
   );
 
@@ -970,7 +970,8 @@ function drawRows(nodeId, list){
       '<div class="nm"><b>'+m.nombre+'</b><small>'+
 'Evidencia '+m.ev+'% · '+
 (m.id==='cor'
-  ? 'U/O '+(getPartido(S.sel).cornerLine!=null ? getPartido(S.sel).cornerLine : '—')+
+  ? ((getPartido(S.sel).cornerSide === 'over' ? 'OVER ' : 'UNDER ') +
+   (getPartido(S.sel).cornerLine!=null ? getPartido(S.sel).cornerLine : '—'))+
     ' · muestra '+(getPartido(S.sel).cornerSample || 0)+' partidos'
   : 'muestra '+(m.valido?'suficiente':'insuficiente')
 )+
