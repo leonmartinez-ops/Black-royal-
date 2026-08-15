@@ -935,7 +935,7 @@ function drawRead(nodeId, list, ok){
     n.appendChild(el('div', b[0], '<span>'+b[1]+'</span><b>'+b[2]+'</b>'));
      });
   if(
-  S.tabG === 'corners' &&
+(S.tabG === 'corners' || S.tabD === 'corners') &&
   p &&
   p.cornerLine != null
 ){
