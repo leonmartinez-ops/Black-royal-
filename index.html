@@ -919,6 +919,7 @@ function pillFor(m){
 
 function drawRead(nodeId, list, ok){
   var n = $(nodeId); n.innerHTML='';
+   var p = vista(getPartido(S.sel));
   var l = lectura(list);
   if(!ok || !l){
     n.innerHTML = '<div style="grid-column:1/-1" class="r"><span>Lectura del modelo</span><b>NO HAY SUFICIENTE INFORMACIÓN</b></div>';
@@ -932,7 +933,32 @@ function drawRead(nodeId, list, ok){
   ];
   boxes.forEach(function(b){
     n.appendChild(el('div', b[0], '<span>'+b[1]+'</span><b>'+b[2]+'</b>'));
-  });
+     });
+  if(
+  S.tabG === 'corners' &&
+  p &&
+  p.cornerLine != null
+){
+
+  n.appendChild(
+    el(
+      'div',
+      'g',
+      '<span>Línea analizada</span>' +
+      '<b>U/O ' + p.cornerLine + '</b>'
+    )
+  );
+
+  n.appendChild(
+    el(
+      'div',
+      '',
+      '<span>Muestra corners</span>' +
+      '<b>' + (p.cornerSample || 0) + ' partidos</b>'
+    )
+  );
+
+}
 }
 
 function drawRows(nodeId, list){
