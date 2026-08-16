@@ -416,8 +416,16 @@ input[type=range]::-webkit-slider-thumb{
     <div class="card flat">
       <div class="head"><h2 id="jj-title">—</h2><span id="jj-count">0/0 analizados</span></div>
       <p class="note">Toca un partido para abrir su análisis. El botón <b>+</b> lo añade al simulador de exposición.</p>
+      <button class="btn cyan" id="analyze-round" style="margin-top:14px">ANALIZAR JORNADA COMPLETA</button>
+      <div id="round-progress"></div>
     </div>
     <div id="match-list"></div>
+
+    <div class="card" id="opportunity-card">
+      <div class="head"><h2>Opportunity Board</h2><span id="opportunity-count">0 señales</span></div>
+      <p class="note">Orden transparente: menor riesgo, mayor evidencia y mayor muestra. Los empates conservan primero la mayor cercanía entre Mercado y RIS.</p>
+      <div id="opportunity-list"></div>
+    </div>
   </section>
 
   <!-- ================= RIS ================= -->
@@ -674,6 +682,7 @@ if(!S.analysisByFixture || typeof S.analysisByFixture !== 'object'){
   S.analysisByFixture = {};
 }
 var torneoIdx = clampInt(S.torneo||0, 0, TORNEOS.length-1);
+var roundAnalysis = {running:false, done:0, total:0, current:''};
 function clampInt(v,a,b){ return Math.max(a,Math.min(b,v|0)); }
 
 /* ============================================================
@@ -693,7 +702,7 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
    Jornada, RIS y el detalle, incluso después de recargar la página. */
 var ANALYSIS_FIELDS = [
   'm','cobertura','confianza','fuente','muestra','risHistorico',
-  'ou15Side','ou25Side','bttsSide','cornerLine','cornerSide',
+  'selection1x2','dcSide','ou15Side','ou25Side','bttsSide','cornerLine','cornerSide',
   'cornerSample','historicoCorners'
 ];
 function fixtureKey(p){
@@ -803,6 +812,56 @@ valido: ev >= UMBRAL_EVIDENCIA,
       cons: Math.round(Math.min(a[0],a[1]) - Math.abs(a[0]-a[1])*0.9 - a[2]*0.35)
     });
   }
+  return out;
+}
+
+function marketSample(p, marketId){
+  if(marketId === 'cor') return Number(p.cornerSample) || 0;
+  if(['ou15','ou25','btts'].indexOf(marketId) > -1){
+    return Number(p.risHistorico && p.risHistorico.muestra) || 0;
+  }
+  return 0;
+}
+
+function marketSelection(p, marketId){
+  if(marketId === 'cor' && p.cornerLine != null){
+    return (p.cornerSide === 'over' ? 'OVER ' : 'UNDER ') + p.cornerLine;
+  }
+  if(marketId === 'ou15') return (p.ou15Side === 'over' ? 'OVER ' : 'UNDER ') + '1.5';
+  if(marketId === 'ou25') return (p.ou25Side === 'over' ? 'OVER ' : 'UNDER ') + '2.5';
+  if(marketId === 'btts') return p.bttsSide === 'yes' ? 'SÍ' : p.bttsSide === 'no' ? 'NO' : '—';
+  if(marketId === '1x2') return p.selection1x2 || '—';
+  if(marketId === 'dc') return p.dcSide || '—';
+  return '—';
+}
+
+function opportunityState(m, sample){
+  if(!m || !m.valido || m.market == null || m.ris == null || m.risk == null || sample < 6){
+    return 'SIN EVIDENCIA';
+  }
+  if(m.risk >= 65) return 'EVITAR';
+  if(m.cons >= 40 && m.risk < 45) return 'CONSISTENTE';
+  return 'CAUTELA';
+}
+
+function opportunityBoard(){
+  var out = [];
+  torneoActual().partidos.forEach(function(p){
+    if(!hasAnalysis(p)) return;
+    mercadosDe(p,'resumen').forEach(function(m){
+      var sample = marketSample(p, m.id);
+      var state = opportunityState(m, sample);
+      out.push({p:p, market:m, sample:sample, state:state, selection:marketSelection(p,m.id)});
+    });
+  });
+  out.sort(function(a,b){
+    var stateOrder = {'CONSISTENTE':0,'CAUTELA':1,'EVITAR':2,'SIN EVIDENCIA':3};
+    return stateOrder[a.state] - stateOrder[b.state] ||
+      ((a.market.risk == null ? 101 : a.market.risk) - (b.market.risk == null ? 101 : b.market.risk)) ||
+      (b.market.ev - a.market.ev) ||
+      (b.sample - a.sample) ||
+      (Math.abs(a.market.market-a.market.ris) - Math.abs(b.market.market-b.market.ris));
+  });
   return out;
 }
 
@@ -1231,6 +1290,58 @@ function renderJornada(){
     wrap.onclick = function(){ openSheet(p.id); };
     n.appendChild(wrap);
   });
+  renderRoundProgress();
+  renderOpportunityBoard();
+}
+
+function renderRoundProgress(){
+  var button = $('analyze-round');
+  var node = $('round-progress');
+  if(!button || !node) return;
+  button.disabled = roundAnalysis.running;
+  button.style.opacity = roundAnalysis.running ? '.55' : '1';
+  button.innerHTML = roundAnalysis.running ? 'ANALIZANDO '+roundAnalysis.done+'/'+roundAnalysis.total : 'ANALIZAR JORNADA COMPLETA';
+  node.innerHTML = roundAnalysis.running
+    ? '<p class="note">Procesando '+roundAnalysis.current+'. Se conservan los snapshots ya analizados y sólo se consulta lo pendiente.</p>'
+    : '';
+}
+
+function renderOpportunityBoard(){
+  var list = opportunityBoard();
+  var valid = list.filter(function(o){ return o.state !== 'SIN EVIDENCIA'; });
+  $('opportunity-count').innerHTML = valid.length + ' señales';
+  var node = $('opportunity-list'); node.innerHTML = '';
+  if(!list.length){
+    node.innerHTML = '<div class="empty"><b>SIN ANÁLISIS DE JORNADA</b><small>Analiza partidos para construir el ranking. Black Royal no llena espacios con datos simulados.</small></div>';
+    return;
+  }
+  list.slice(0,12).forEach(function(o){
+    var m = o.market;
+    var cls = o.state==='CONSISTENTE'?'good':o.state==='CAUTELA'?'mid':o.state==='EVITAR'?'bad':'void';
+    var row = el('div','row');
+    row.innerHTML =
+      '<div class="nm"><b>'+o.p.local+' vs '+o.p.visitante+'</b><small>'+m.nombre+' · '+o.selection+' · Mercado '+(m.market==null?'—':m.market)+' · RIS '+(m.ris==null?'—':m.ris)+' · riesgo '+(m.risk==null?'—':m.risk)+' · evidencia '+m.ev+'% · muestra '+o.sample+'</small></div>'+
+      '<div class="pill '+cls+'">'+o.state+'</div>';
+    row.style.cursor='pointer';
+    row.onclick = function(){ openSheet(o.p.id); };
+    node.appendChild(row);
+  });
+}
+
+async function analyzeCurrentRound(){
+  if(roundAnalysis.running) return;
+  var pending = torneoActual().partidos.filter(function(p){ return p.fixtureId && !hasAnalysis(p); });
+  roundAnalysis = {running:true, done:0, total:pending.length, current:''};
+  renderJornada();
+  for(var i=0;i<pending.length;i++){
+    roundAnalysis.current = pending[i].local+' vs '+pending[i].visitante;
+    renderRoundProgress();
+    await cargarAnalisisPartido(pending[i]);
+    roundAnalysis.done = i+1;
+    renderJornada();
+  }
+  roundAnalysis.running = false;
+  renderAll();
 }
 
 function toggleActivo(id){
@@ -1416,6 +1527,7 @@ async function cargarAnalisisPartido(p){
 
       if(modelo.Draw > modelo[seleccion]) seleccion = 'Draw';
       if(modelo.Away > modelo[seleccion]) seleccion = 'Away';
+      p.selection1x2 = seleccion;
 
       var diferencia = Math.abs(
         mercado[seleccion] - modelo[seleccion]
@@ -1463,6 +1575,7 @@ async function cargarAnalisisPartido(p){
 
       const mejor = opciones[0];
       const oddDC = buscarValor(dc,mejor.value);
+      p.dcSide = mejor.value;
 
       if(oddDC){
 
@@ -2188,6 +2301,7 @@ Array.prototype.slice.call($('nav').children).forEach(function(b){
 
 $('sheet-back').onclick = closeSheet;
 $('d-add').onclick = function(){ toggleActivo(S.sel); renderSheet(); renderTerminal(); renderJornada(); };
+$('analyze-round').onclick = analyzeCurrentRound;
 
 function cambiarTorneo(delta){
   torneoIdx = (torneoIdx + delta + TORNEOS.length) % TORNEOS.length;
