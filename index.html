@@ -426,6 +426,12 @@ input[type=range]::-webkit-slider-thumb{
       <p class="note">Orden transparente: menor riesgo, mayor evidencia y mayor muestra. Los empates conservan primero la mayor cercanía entre Mercado y RIS.</p>
       <div id="opportunity-list"></div>
     </div>
+
+    <div class="card" id="postmatch-card">
+      <div class="head"><h2>Registro postpartido</h2><span id="postmatch-count">0 finalizados</span></div>
+      <p class="note">Compara únicamente análisis guardados antes del inicio contra resultados y estadísticas finales. Si API-Football todavía no publica un dato, queda PENDIENTE.</p>
+      <div id="postmatch-list"></div>
+    </div>
   </section>
 
   <!-- ================= RIS ================= -->
@@ -672,6 +678,8 @@ var DEFAULT_STATE = {
   activos:[],              // ids de partidos en el simulador
   exposicion:{},           // id -> % de banca
   analysisByFixture:{},    // fixtureId -> snapshot RIS compartido y persistente
+  fixtureArchive:{},       // fixtureId -> identidad y estado del partido
+  resultsByFixture:{},     // fixtureId -> resultado, estadísticas y validación
   visibles:['1x2','dc','btts','ou25','cor','dcg']
 };
 
@@ -681,6 +689,8 @@ if(saved){ S = Object.assign({}, DEFAULT_STATE, saved); }
 if(!S.analysisByFixture || typeof S.analysisByFixture !== 'object'){
   S.analysisByFixture = {};
 }
+if(!S.fixtureArchive || typeof S.fixtureArchive !== 'object') S.fixtureArchive = {};
+if(!S.resultsByFixture || typeof S.resultsByFixture !== 'object') S.resultsByFixture = {};
 var torneoIdx = clampInt(S.torneo||0, 0, TORNEOS.length-1);
 var roundAnalysis = {running:false, done:0, total:0, current:''};
 function clampInt(v,a,b){ return Math.max(a,Math.min(b,v|0)); }
@@ -726,6 +736,10 @@ function persistAnalysisSnapshot(p){
   if(!key) return;
   var snapshot = {
     fixtureId:p.fixtureId,
+    local:p.local,
+    visitante:p.visitante,
+    fecha:p.fecha || null,
+    hora:p.hora || null,
     analysisStatus:'complete',
     analyzedAt:new Date().toISOString()
   };
@@ -740,9 +754,120 @@ function persistAnalysisSnapshot(p){
   save();
 }
 
+function archiveFixture(p){
+  var key = fixtureKey(p);
+  if(!key) return;
+  S.fixtureArchive[key] = {
+    id:p.id,
+    fixtureId:p.fixtureId,
+    local:p.local,
+    visitante:p.visitante,
+    fecha:p.fecha || null,
+    hora:p.hora || null,
+    kickoff:p.kickoff || null,
+    round:p.round || null,
+    status:p.status || null,
+    goals:p.goals || null
+  };
+}
+
+function resultSide(fixture){
+  var h = fixture && fixture.goals ? fixture.goals.home : null;
+  var a = fixture && fixture.goals ? fixture.goals.away : null;
+  if(h == null || a == null) return null;
+  return h>a ? 'Home' : a>h ? 'Away' : 'Draw';
+}
+
+function validationOutcome(condition){ return condition ? 'ACIERTO' : 'FALLO'; }
+
+function validateSnapshot(snapshot, fixture, stats){
+  if(!snapshot || !snapshot.analyzedAt) return {status:'SIN ANÁLISIS PREVIO', markets:[]};
+  var kickoff = fixture && fixture.fixture && fixture.fixture.date;
+  if(kickoff && new Date(snapshot.analyzedAt).getTime() > new Date(kickoff).getTime()){
+    return {status:'SIN ANÁLISIS PREVIO', markets:[]};
+  }
+  var totalGoals = fixture.goals.home + fixture.goals.away;
+  var side = resultSide(fixture);
+  var markets = [];
+  function add(id, label, selection, outcome){
+    var values = snapshot.m && snapshot.m[id];
+    if(!values || values[0] == null || values[1] == null) return;
+    markets.push({id:id,label:label,selection:selection,outcome:outcome});
+  }
+  if(snapshot.selection1x2) add('1x2','1X2',snapshot.selection1x2,validationOutcome(snapshot.selection1x2===side));
+  if(snapshot.dcSide){
+    var allowed = String(snapshot.dcSide).split('/');
+    add('dc','Doble oportunidad',snapshot.dcSide,validationOutcome(allowed.indexOf(side)>-1));
+  }
+  if(snapshot.ou15Side){
+    add('ou15','Goles 1.5',snapshot.ou15Side.toUpperCase()+' 1.5',validationOutcome(snapshot.ou15Side==='over' ? totalGoals>1.5 : totalGoals<1.5));
+  }
+  if(snapshot.ou25Side){
+    add('ou25','Goles 2.5',snapshot.ou25Side.toUpperCase()+' 2.5',validationOutcome(snapshot.ou25Side==='over' ? totalGoals>2.5 : totalGoals<2.5));
+  }
+  if(snapshot.bttsSide){
+    var btts = fixture.goals.home>0 && fixture.goals.away>0;
+    add('btts','BTTS',snapshot.bttsSide==='yes'?'SÍ':'NO',validationOutcome(snapshot.bttsSide==='yes' ? btts : !btts));
+  }
+  if(snapshot.cornerLine != null && snapshot.cornerSide){
+    var totalCorners = stats.totalCorners;
+    var cornerOutcome = 'PENDIENTE';
+    if(totalCorners != null){
+      cornerOutcome = validationOutcome(snapshot.cornerSide==='over' ? totalCorners>snapshot.cornerLine : totalCorners<snapshot.cornerLine);
+    }
+    add('cor','Córners',snapshot.cornerSide.toUpperCase()+' '+snapshot.cornerLine,cornerOutcome);
+  }
+  return {status:markets.length?'VALIDADO':'SIN EVIDENCIA', markets:markets};
+}
+
+function readTeamStat(teamStats, type){
+  if(!teamStats || !Array.isArray(teamStats.statistics)) return null;
+  var item = teamStats.statistics.find(function(s){ return s.type===type; });
+  return item && item.value != null ? item.value : null;
+}
+
+function buildPostMatchRecord(p, fixture){
+  var teams = Array.isArray(fixture.statistics) ? fixture.statistics : [];
+  var homeId = fixture.teams && fixture.teams.home && fixture.teams.home.id;
+  var awayId = fixture.teams && fixture.teams.away && fixture.teams.away.id;
+  var homeStats = teams.find(function(t){ return t.team && t.team.id===homeId; }) || null;
+  var awayStats = teams.find(function(t){ return t.team && t.team.id===awayId; }) || null;
+  var homeCorners = readTeamStat(homeStats,'Corner Kicks');
+  var awayCorners = readTeamStat(awayStats,'Corner Kicks');
+  var stats = {
+    homeCorners:homeCorners,
+    awayCorners:awayCorners,
+    totalCorners:homeCorners!=null && awayCorners!=null ? Number(homeCorners)+Number(awayCorners) : null,
+    homeShots:readTeamStat(homeStats,'Total Shots'),
+    awayShots:readTeamStat(awayStats,'Total Shots'),
+    homeShotsOnGoal:readTeamStat(homeStats,'Shots on Goal'),
+    awayShotsOnGoal:readTeamStat(awayStats,'Shots on Goal'),
+    homePossession:readTeamStat(homeStats,'Ball Possession'),
+    awayPossession:readTeamStat(awayStats,'Ball Possession'),
+    homeXg:readTeamStat(homeStats,'expected_goals'),
+    awayXg:readTeamStat(awayStats,'expected_goals'),
+    homeYellow:readTeamStat(homeStats,'Yellow Cards'),
+    awayYellow:readTeamStat(awayStats,'Yellow Cards'),
+    homeRed:readTeamStat(homeStats,'Red Cards'),
+    awayRed:readTeamStat(awayStats,'Red Cards')
+  };
+  var snapshot = S.analysisByFixture[String(p.fixtureId)] || null;
+  return {
+    fixtureId:p.fixtureId,
+    local:p.local,
+    visitante:p.visitante,
+    kickoff:p.kickoff,
+    score:{home:fixture.goals.home,away:fixture.goals.away},
+    stats:stats,
+    validation:validateSnapshot(snapshot,fixture,stats),
+    syncedAt:new Date().toISOString()
+  };
+}
+
 /* Aplica DEMO MODE sobre un partido sin tocar los datos originales. */
 function vista(p){
   var d = S.demo, o = {id:p.id, fixtureId:p.fixtureId, local:p.local, visitante:p.visitante, hora:p.hora,
+    status:p.status, kickoff:p.kickoff, goals:p.goals,
     cobertura:p.cobertura, confianza:p.confianza, fuente:p.fuente, muestra:p.muestra,
     analysisStatus:p.analysisStatus, analyzedAt:p.analyzedAt, m:{}};
   var f = {risk:1, ev:1, ris:1, cov:1, conf:1};
@@ -789,7 +914,12 @@ function hasAnalysis(p){
   return !!(key && S.analysisByFixture[key]);
 }
 
+function isFinishedFixture(p){
+  return !!(p && ['FT','AET','PEN'].indexOf(p.status)>-1);
+}
+
 function estado(p){
+  if(isFinishedFixture(p)) return {t:'FINALIZADO', c:'var(--blue)'};
   if(!hasAnalysis(p)) return {t:'SIN ANALIZAR', c:'var(--red)'};
   var i = integrity(p);
   if(i.score < UMBRAL_SCORE) return {t:'DATOS PARCIALES', c:'var(--orange)'};
@@ -1292,6 +1422,7 @@ function renderJornada(){
   });
   renderRoundProgress();
   renderOpportunityBoard();
+  renderPostMatchArchive();
 }
 
 function renderRoundProgress(){
@@ -1328,9 +1459,58 @@ function renderOpportunityBoard(){
   });
 }
 
+function renderPostMatchArchive(){
+  var records = Object.keys(S.resultsByFixture).map(function(k){ return S.resultsByFixture[k]; });
+  records.sort(function(a,b){ return String(b.kickoff||'').localeCompare(String(a.kickoff||'')); });
+  $('postmatch-count').innerHTML = records.length + ' finalizados';
+  var node = $('postmatch-list'); node.innerHTML='';
+  if(!records.length){
+    node.innerHTML = '<div class="empty"><b>SIN PARTIDOS FINALIZADOS</b><small>Al abrir Black Royal se sincronizarán resultados oficiales y se conservarán en este dispositivo.</small></div>';
+    return;
+  }
+  records.forEach(function(r){
+    var markets = r.validation && Array.isArray(r.validation.markets) ? r.validation.markets : [];
+    var wins = markets.filter(function(m){ return m.outcome==='ACIERTO'; }).length;
+    var losses = markets.filter(function(m){ return m.outcome==='FALLO'; }).length;
+    var pending = markets.filter(function(m){ return m.outcome==='PENDIENTE'; }).length;
+    var cls = losses===0 && wins>0 ? 'good' : wins>0 ? 'mid' : losses>0 ? 'bad' : 'void';
+    var summary = markets.length
+      ? markets.map(function(m){ return m.label+' '+m.selection+': '+m.outcome; }).join(' · ')
+      : (r.validation ? r.validation.status : 'SIN ANÁLISIS PREVIO');
+    var corners = r.stats && r.stats.totalCorners!=null ? ' · córners '+r.stats.totalCorners : ' · córners pendientes';
+    var row = el('div','row');
+    row.innerHTML =
+      '<div class="nm"><b>'+r.local+' '+r.score.home+'–'+r.score.away+' '+r.visitante+'</b><small>'+summary+corners+'</small></div>'+
+      '<div class="pill '+cls+'">'+wins+' A · '+losses+' F'+(pending?' · '+pending+' P':'')+'</div>';
+    node.appendChild(row);
+  });
+}
+
+async function syncFinishedFixtures(partidos){
+  var finished = partidos.filter(function(p){ return ['FT','AET','PEN'].indexOf(p.status)>-1; });
+  for(var i=0;i<finished.length;i++){
+    var p = finished[i], key = String(p.fixtureId);
+    var existing = S.resultsByFixture[key];
+    if(existing && existing.stats && existing.stats.totalCorners != null) continue;
+    try{
+      var res = await fetch('/.netlify/functions/api-football?endpoint=fixtures&ids='+p.fixtureId);
+      var data = await res.json();
+      var fixture = data && data.response && data.response[0];
+      if(!fixture || !fixture.goals || fixture.goals.home==null || fixture.goals.away==null) continue;
+      S.resultsByFixture[key] = buildPostMatchRecord(p,fixture);
+      save();
+      renderPostMatchArchive();
+    }catch(error){
+      console.warn('BLACK ROYAL · Error sincronizando resultado '+p.fixtureId,error);
+    }
+  }
+}
+
 async function analyzeCurrentRound(){
   if(roundAnalysis.running) return;
-  var pending = torneoActual().partidos.filter(function(p){ return p.fixtureId && !hasAnalysis(p); });
+  var pending = torneoActual().partidos.filter(function(p){
+    return p.fixtureId && !isFinishedFixture(p) && !hasAnalysis(p);
+  });
   roundAnalysis = {running:true, done:0, total:pending.length, current:''};
   renderJornada();
   for(var i=0;i<pending.length;i++){
@@ -2217,7 +2397,7 @@ function openSheet(id){
 
   var p = getPartido(id);
 
-  if(p && p.fixtureId){
+  if(p && p.fixtureId && !isFinishedFixture(p)){
     cargarAnalisisPartido(p);
   }
 
@@ -2238,7 +2418,7 @@ function renderSheet(){
   $('d-teams').innerHTML = p.local + '<i>vs</i>' + p.visitante;
   $('d-meta').innerHTML =
     '<div class="pill info">'+p.hora+'</div>'+
-    '<div class="pill '+(st.t==='ANALIZADO'?'good':st.t==='DATOS PARCIALES'?'mid':'bad')+'">'+st.t+'</div>'+
+    '<div class="pill '+(st.t==='ANALIZADO'?'good':st.t==='DATOS PARCIALES'?'mid':st.t==='FINALIZADO'?'info':'bad')+'">'+st.t+'</div>'+
     '<div class="pill void">MUESTRA '+p.muestra+'</div>';
 
   var tabs = $('d-tabs'); tabs.innerHTML='';
@@ -2347,21 +2527,31 @@ $('reset').onclick = function(){
 /* ============================================================
    6. ARRANQUE
    ============================================================ */
+var leagueSyncRunning = false;
 async function cargarLigaMX(){
+  if(leagueSyncRunning) return;
+  leagueSyncRunning = true;
   try{
-    const res = await fetch('/.netlify/functions/api-football?league=262&season=2026&next=10');
-    const data = await res.json();
+    const res = await fetch('/.netlify/functions/api-football?endpoint=fixtures&league=262&season=2026&next=10');
+    const nextData = await res.json();
 
-    console.log('BLACK ROYAL · Liga MX API:', data);
-    window.BLACK_ROYAL_API = data;
+    console.log('BLACK ROYAL · Liga MX próximos:', nextData);
+    window.BLACK_ROYAL_API = nextData;
 
-    if(data.response && data.response.length){
+    if(nextData.response && nextData.response.length){
 
-      const rondaActual = data.response[0].league.round;
-
-      const partidosJornada = data.response.filter(
-        p => p.league.round === rondaActual
+      const rondaActual = nextData.response[0].league.round;
+      const roundRes = await fetch(
+        '/.netlify/functions/api-football?endpoint=fixtures&league=262&season=2026&round=' +
+        encodeURIComponent(rondaActual)
       );
+      const roundData = await roundRes.json();
+
+      const partidosJornada = roundData && Array.isArray(roundData.response) && roundData.response.length
+        ? roundData.response
+        : nextData.response.filter(function(p){ return p.league.round === rondaActual; });
+
+      TORNEOS[0].etiqueta = rondaActual;
 
       TORNEOS[0].partidos = partidosJornada.map((p, i) => {
 
@@ -2371,6 +2561,10 @@ async function cargarLigaMX(){
   id: 'api-' + p.fixture.id,
   identificacion: 'api-' + p.fixture.id,
   fixtureId: p.fixture.id,
+          kickoff: p.fixture.date,
+          round: p.league.round,
+          status: p.fixture.status && p.fixture.status.short,
+          goals: p.goals,
            
           local: p.teams.home.name,
           visitante: p.teams.away.name,
@@ -2402,8 +2596,10 @@ m: baseMercados(null)
       });
 
       TORNEOS[0].partidos.forEach(function(partido){
+        archiveFixture(partido);
         applyAnalysisSnapshot(partido);
       });
+      save();
 
       console.log(
         'BLACK ROYAL · Jornada cargada:',
@@ -2412,14 +2608,20 @@ m: baseMercados(null)
       );
 
       renderAll();
+      await syncFinishedFixtures(TORNEOS[0].partidos);
     }
 
   }catch(error){
     console.error('Error cargando Liga MX:', error);
+  }finally{
+    leagueSyncRunning = false;
   }
 }
 
 cargarLigaMX();
+setInterval(function(){
+  if(!document.hidden) cargarLigaMX();
+}, 10*60*1000);
 renderAll();
 setVista(S.vista || 'terminal');
 </script>
