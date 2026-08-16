@@ -162,16 +162,107 @@
       var saved=getSaved(), snap=saved.analysisByFixture&&saved.analysisByFixture[String(id)];
       return snap||null;
     }
+    function saveSnapshot(id,snapshot){
+      try{
+        var saved=getSaved();if(!saved.analysisByFixture)saved.analysisByFixture={};
+        saved.analysisByFixture[String(id)]=snapshot;
+        localStorage.setItem('br_state_v1',JSON.stringify(saved));
+      }catch(e){}
+    }
+    function pct(v){var n=parseFloat(String(v==null?'':v).replace('%',''));return isNaN(n)?null:Math.round(n);}
+    function implied(odd){var n=Number(odd);return n>1?100/n:null;}
+    function normalized(values){
+      var raw=values.map(implied);if(raw.some(function(v){return v==null;}))return null;
+      var sum=raw.reduce(function(a,b){return a+b;},0);return raw.map(function(v){return Math.round(v/sum*100);});
+    }
+    function allBets(odds){
+      var out=[],responses=odds&&Array.isArray(odds.response)?odds.response:[];
+      responses.forEach(function(r){(r.bookmakers||[]).forEach(function(b){(b.bets||[]).forEach(function(bet){out.push(bet);});});});return out;
+    }
+    function findBet(bets,re){return bets.find(function(b){return re.test(String(b.name||''))&&Array.isArray(b.values);})||null;}
+    function oddValue(bet,names){
+      if(!bet)return null;var lowered=names.map(function(n){return n.toLowerCase();});
+      var row=bet.values.find(function(v){return lowered.indexOf(String(v.value||'').toLowerCase())>-1;});return row||null;
+    }
+    function uniqueHistory(home,away){
+      var map={};(home||[]).concat(away||[]).forEach(function(m){if(m&&m.fixture&&m.fixture.id)map[m.fixture.id]=m;});return Object.keys(map).map(function(k){return map[k];});
+    }
+    function pairLines(bet){
+      var lines={};if(!bet)return lines;(bet.values||[]).forEach(function(v){var m=String(v.value||'').match(/^(Over|Under)\s+([0-9.]+)/i);if(!m)return;var line=Number(m[2]);if(!lines[line])lines[line]={};lines[line][m[1].toLowerCase()]=v;});return lines;
+    }
+    function bestBalancedLine(lines){
+      var best=null,gap=Infinity;Object.keys(lines).forEach(function(k){var p=lines[k];if(!p.over||!p.under)return;var probs=normalized([p.over.odd,p.under.odd]);if(!probs)return;var g=Math.abs(probs[0]-probs[1]);if(g<gap){gap=g;best={line:Number(k),over:p.over,under:p.under,probs:probs};}});return best;
+    }
+    function blankMarkets(){var out={};Object.keys(marketNames).forEach(function(k){out[k]=[null,null,null,6];});return out;}
+    function marketTuple(market,ris,evidence){return [market,ris,market==null||ris==null?null:Math.abs(market-ris),evidence];}
+    function statMap(fixture){
+      var total={corners:0,cards:0,teams:0};if(!fixture||!Array.isArray(fixture.statistics))return null;
+      fixture.statistics.forEach(function(row){if(!row||!Array.isArray(row.statistics))return;var corners=row.statistics.find(function(s){return s.type==='Corner Kicks';});var yellow=row.statistics.find(function(s){return s.type==='Yellow Cards';});var red=row.statistics.find(function(s){return s.type==='Red Cards';});if(corners&&corners.value!=null){total.corners+=Number(corners.value)||0;total.teams++;}total.cards+=(yellow&&Number(yellow.value)||0)+(red&&Number(red.value)||0);});return total.teams===2?total:null;
+    }
+    function analyzeFixture(item){
+      var id=item.fixture.id,homeId=item.teams.home.id,awayId=item.teams.away.id;
+      return Promise.all([
+        api('predictions',{fixture:id}),api('odds',{fixture:id}),
+        api('fixtures',{team:homeId,last:50}),api('fixtures',{team:awayId,last:50})
+      ]).then(function(data){
+        var prediction=data[0]&&data[0].response&&data[0].response[0],bets=allBets(data[1]);
+        var homeHistory=data[2].response||[],awayHistory=data[3].response||[],history=uniqueHistory(homeHistory,awayHistory);
+        var valid=history.filter(function(m){return m.goals&&m.goals.home!=null&&m.goals.away!=null;});
+        var m=blankMarkets(),snap={fixtureId:id,local:item.teams.home.name,visitante:item.teams.away.name,analyzedAt:new Date().toISOString(),analysisStatus:'complete',m:m,risHistorico:{muestra:valid.length}};
+        var model=prediction&&prediction.predictions&&prediction.predictions.percent||{};
+        var ph=pct(model.home),pd=pct(model.draw),pa=pct(model.away);
+        var matchWinner=findBet(bets,/^Match Winner$/i),homeOdd=oddValue(matchWinner,['Home']),drawOdd=oddValue(matchWinner,['Draw']),awayOdd=oddValue(matchWinner,['Away']);
+        var resultMarket=homeOdd&&drawOdd&&awayOdd?normalized([homeOdd.odd,drawOdd.odd,awayOdd.odd]):null;
+        if(ph!=null&&pd!=null&&pa!=null&&resultMarket){
+          var probs=[ph,pd,pa],idx=probs.indexOf(Math.max.apply(null,probs));snap.selection1x2=['Home','Draw','Away'][idx];m['1x2']=marketTuple(resultMarket[idx],probs[idx],90);
+          var dcModels=[ph+pd,ph+pa,pd+pa],dcIdx=dcModels.indexOf(Math.max.apply(null,dcModels)),dcNames=['Home/Draw','Home/Away','Draw/Away'];snap.dcSide=dcNames[dcIdx];
+          var dcBet=findBet(bets,/Double Chance/i),dcRow=oddValue(dcBet,[['1X','12','X2'][dcIdx],dcNames[dcIdx]]),dcMarket=dcRow?implied(dcRow.odd):null;
+          if(dcMarket!=null)m.dc=marketTuple(Math.round(dcMarket),dcModels[dcIdx],88);
+        }
+        var counts={over15:0,over25:0,btts:0,fh05:0,fh15:0,fhValid:0};
+        valid.forEach(function(g){var total=Number(g.goals.home)+Number(g.goals.away);if(total>1.5)counts.over15++;if(total>2.5)counts.over25++;if(Number(g.goals.home)>0&&Number(g.goals.away)>0)counts.btts++;var ht=g.score&&g.score.halftime;if(ht&&ht.home!=null&&ht.away!=null){counts.fhValid++;var first=Number(ht.home)+Number(ht.away);if(first>.5)counts.fh05++;if(first>1.5)counts.fh15++;}});
+        function historyMarket(key,probOver,bet,line){
+          if(!valid.length||!bet)return;var over=oddValue(bet,['Over '+line]),under=oddValue(bet,['Under '+line]);if(!over||!under)return;var probs=normalized([over.odd,under.odd]);if(!probs)return;var side=probOver>=50?'over':'under',ris=side==='over'?probOver:100-probOver,market=side==='over'?probs[0]:probs[1];snap[key+'Side']=side;m[key]=marketTuple(market,Math.round(ris),90);
+        }
+        var goalsBet=findBet(bets,/^Goals Over\/Under$/i);
+        historyMarket('ou15',Math.round(counts.over15/Math.max(1,valid.length)*100),goalsBet,1.5);
+        historyMarket('ou25',Math.round(counts.over25/Math.max(1,valid.length)*100),goalsBet,2.5);
+        var bttsBet=findBet(bets,/Both Teams Score/i),yes=oddValue(bttsBet,['Yes']),no=oddValue(bttsBet,['No']);
+        if(valid.length&&yes&&no){var bp=normalized([yes.odd,no.odd]),bris=Math.round(counts.btts/valid.length*100);snap.bttsSide=bris>=50?'yes':'no';m.btts=marketTuple(snap.bttsSide==='yes'?bp[0]:bp[1],snap.bttsSide==='yes'?bris:100-bris,90);}
+        var fhBet=findBet(bets,/(First Half.*Goals Over\/Under|Goals Over\/Under.*First Half)/i),fhLines=pairLines(fhBet),fh=fhLines[1.5]?{line:1.5,over:fhLines[1.5].over,under:fhLines[1.5].under}:fhLines[.5]?{line:.5,over:fhLines[.5].over,under:fhLines[.5].under}:null;
+        if(fh&&fh.over&&fh.under&&counts.fhValid){var fhOdds=normalized([fh.over.odd,fh.under.odd]),fhOver=Math.round((fh.line===1.5?counts.fh15:counts.fh05)/counts.fhValid*100),fhSide=fhOver>=50?'over':'under';snap.h1Side=fhSide;snap.h1Line=fh.line;m.h1=marketTuple(fhSide==='over'?fhOdds[0]:fhOdds[1],fhSide==='over'?fhOver:100-fhOver,82);}
+        var sampleIds=[];(homeHistory.slice(0,6).concat(awayHistory.slice(0,6))).forEach(function(g){if(g.fixture&&sampleIds.indexOf(g.fixture.id)<0)sampleIds.push(g.fixture.id);});
+        if(!sampleIds.length){saveSnapshot(id,snap);return snap;}
+        return api('fixtures',{ids:sampleIds.slice(0,12).join('-')}).then(function(statData){
+          var rows=(statData.response||[]).map(statMap).filter(Boolean),corners=rows.map(function(r){return r.corners;}),cards=rows.map(function(r){return r.cards;});
+          function totalMarket(key,betRegex,series){
+            var bet=findBet(bets,betRegex),best=bestBalancedLine(pairLines(bet));if(!best||series.length<6)return;
+            var over=series.filter(function(v){return v>best.line;}).length/series.length*100,side=over>=50?'over':'under',ris=side==='over'?over:100-over,market=side==='over'?best.probs[0]:best.probs[1];
+            snap[key+'Line']=best.line;snap[key+'Side']=side;if(key==='cor'){snap.cornerLine=best.line;snap.cornerSide=side;snap.cornerSample=series.length;}else{snap.cardSample=series.length;}
+            m[key]=marketTuple(market,Math.round(ris),Math.min(95,45+series.length*4));
+          }
+          totalMarket('cor',/(corners over under|corner.*over.*under|total corners)/i,corners);totalMarket('tar',/(cards over under|booking.*over.*under|total cards)/i,cards);
+          saveSnapshot(id,snap);return snap;
+        }).catch(function(){saveSnapshot(id,snap);return snap;});
+      });
+    }
+    function ensureAnalysis(item){
+      var existing=savedSnapshot(item.fixture.id);if(existing)return Promise.resolve(existing);
+      if(isLive(item)||isFinished(item))return Promise.resolve(null);
+      return analyzeFixture(item);
+    }
     function selection(s,id){
       if(id==='cor'&&s.cornerLine!=null)return (s.cornerSide==='over'?'OVER ':'UNDER ')+s.cornerLine;
       if(id==='ou15')return (s.ou15Side==='over'?'OVER ':'UNDER ')+'1.5';
       if(id==='ou25')return (s.ou25Side==='over'?'OVER ':'UNDER ')+'2.5';
       if(id==='btts')return s.bttsSide==='yes'?'SÍ':s.bttsSide==='no'?'NO':'—';
+      if(id==='h1'&&s.h1Line!=null)return (s.h1Side==='over'?'OVER ':'UNDER ')+s.h1Line;
+      if(id==='tar'&&s.tarLine!=null)return (s.tarSide==='over'?'OVER ':'UNDER ')+s.tarLine;
       if(id==='1x2')return s.selection1x2||'—';if(id==='dc')return s.dcSide||'—';return '—';
     }
     function opportunities(id){
       var legacy=verifiedLegacy[String(id)], snap=savedSnapshot(id), out=[];
-      if(snap&&snap.m){Object.keys(snap.m).forEach(function(k){var a=snap.m[k],sample=k==='cor'?Number(snap.cornerSample)||0:Number(snap.risHistorico&&snap.risHistorico.muestra)||0;if(a&&a[0]!=null&&a[1]!=null&&a[2]!=null&&Number(a[3])>=35&&sample>=6)out.push({id:k,selection:selection(snap,k),market:a[0],ris:a[1],risk:a[2],evidence:a[3],sample:sample});});}
+      if(snap&&snap.m){Object.keys(snap.m).forEach(function(k){var a=snap.m[k],sample=k==='cor'?Number(snap.cornerSample)||0:k==='tar'?Number(snap.cardSample)||0:Number(snap.risHistorico&&snap.risHistorico.muestra)||0;if(a&&a[0]!=null&&a[1]!=null&&a[2]!=null&&Number(a[3])>=35&&sample>=6)out.push({id:k,selection:selection(snap,k),market:a[0],ris:a[1],risk:a[2],evidence:a[3],sample:sample});});}
       if(!out.length&&legacy&&legacy.opportunities)out=legacy.opportunities.slice();
       return out.sort(function(a,b){return a.risk-b.risk||b.evidence-a.evidence||b.sample-a.sample;}).slice(0,10);
     }
@@ -221,8 +312,10 @@
     function openFixture(id){
       var item=state.fixtures.find(function(f){return f.fixture.id===id;});if(!item)return;
       state.selected=id;var panel=document.getElementById('detail');panel.classList.add('on');panel.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
-      document.getElementById('detail-content').innerHTML='<div class="hero"><div class="loader"><i></i>Preparando la lectura del partido…</div></div>';
-      api('fixtures',{id:id}).then(function(data){var detail=data.response&&data.response[0]?data.response[0]:item;renderDetail(item,detail);}).catch(function(){renderDetail(item,item);});
+      document.getElementById('detail-content').innerHTML='<div class="hero"><div class="loader"><i></i>Analizando historial, mercado y señal RIS…</div></div>';
+      Promise.all([api('fixtures',{id:id}).catch(function(){return {response:[item]};}),ensureAnalysis(item).catch(function(){return null;})]).then(function(data){
+        var detail=data[0].response&&data[0].response[0]?data[0].response[0]:item;renderDetail(item,detail);
+      });
     }
     function closeDetail(){var p=document.getElementById('detail');p.classList.remove('on');p.setAttribute('aria-hidden','true');document.body.style.overflow='';state.selected=null;}
     function mergeLive(live){
