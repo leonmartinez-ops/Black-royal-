@@ -754,6 +754,43 @@ function persistAnalysisSnapshot(p){
   save();
 }
 
+/* Migración única de Córners RIS V1 verificados antes de los partidos.
+   Sólo recupera valores observados y documentados; no reconstruye otros mercados. */
+function restoreVerifiedLegacyCorners(){
+  var verified = {
+    '1550921':{local:'Atlante FC',visitante:'Toluca',line:9.5,side:'over',sample:11,values:[54,55,1,89]},
+    '1550922':{local:'Monterrey',visitante:'FC Juarez',line:9.5,side:'under',sample:12,values:[59,50,9,93]},
+    '1550923':{local:'Atlas',visitante:'Tigres UANL',line:9.5,side:'under',sample:12,values:[59,58,1,93]}
+  };
+  var changed = false;
+  Object.keys(verified).forEach(function(key){
+    if(S.analysisByFixture[key]) return;
+    var v = verified[key], markets = baseMercados(null);
+    markets.cor = v.values.slice();
+    S.analysisByFixture[key] = {
+      fixtureId:Number(key),
+      local:v.local,
+      visitante:v.visitante,
+      analysisStatus:'verified-recovery',
+      analyzedAt:null,
+      preMatchVerified:true,
+      provenance:'VERIFIED LEGACY CORNERS',
+      m:markets,
+      cobertura:0,
+      confianza:0,
+      fuente:100,
+      muestra:0,
+      cornerLine:v.line,
+      cornerSide:v.side,
+      cornerSample:v.sample
+    };
+    changed = true;
+  });
+  if(changed) save();
+}
+
+restoreVerifiedLegacyCorners();
+
 function archiveFixture(p){
   var key = fixtureKey(p);
   if(!key) return;
@@ -781,9 +818,9 @@ function resultSide(fixture){
 function validationOutcome(condition){ return condition ? 'ACIERTO' : 'FALLO'; }
 
 function validateSnapshot(snapshot, fixture, stats){
-  if(!snapshot || !snapshot.analyzedAt) return {status:'SIN ANÁLISIS PREVIO', markets:[]};
+  if(!snapshot || (!snapshot.analyzedAt && !snapshot.preMatchVerified)) return {status:'SIN ANÁLISIS PREVIO', markets:[]};
   var kickoff = fixture && fixture.fixture && fixture.fixture.date;
-  if(kickoff && new Date(snapshot.analyzedAt).getTime() > new Date(kickoff).getTime()){
+  if(snapshot.analyzedAt && kickoff && new Date(snapshot.analyzedAt).getTime() > new Date(kickoff).getTime()){
     return {status:'SIN ANÁLISIS PREVIO', markets:[]};
   }
   var totalGoals = fixture.goals.home + fixture.goals.away;
@@ -1491,7 +1528,16 @@ async function syncFinishedFixtures(partidos){
   for(var i=0;i<finished.length;i++){
     var p = finished[i], key = String(p.fixtureId);
     var existing = S.resultsByFixture[key];
-    if(existing && existing.stats && existing.stats.totalCorners != null) continue;
+    if(existing && existing.stats && existing.stats.totalCorners != null){
+      existing.validation = validateSnapshot(S.analysisByFixture[key] || null, {
+        fixture:{date:p.kickoff},
+        goals:existing.score
+      }, existing.stats);
+      existing.syncedAt = new Date().toISOString();
+      S.resultsByFixture[key] = existing;
+      save();
+      continue;
+    }
     try{
       var res = await fetch('/.netlify/functions/api-football?endpoint=fixtures&ids='+p.fixtureId);
       var data = await res.json();
@@ -2413,13 +2459,22 @@ function closeSheet(){
 }
 
 function renderSheet(){
-  var p = vista(getPartido(S.sel));
+  var raw = getPartido(S.sel);
+  var p = vista(raw);
   var st = estado(p);
+  var sampleText;
+  if(raw.analysisStatus==='verified-recovery'){
+    sampleText = S.tabD==='corners'
+      ? 'MUESTRA CÓRNERS '+(raw.cornerSample||0)
+      : 'MUESTRA NO RECUPERADA';
+  }else{
+    sampleText = 'MUESTRA '+p.muestra;
+  }
   $('d-teams').innerHTML = p.local + '<i>vs</i>' + p.visitante;
   $('d-meta').innerHTML =
     '<div class="pill info">'+p.hora+'</div>'+
     '<div class="pill '+(st.t==='ANALIZADO'?'good':st.t==='DATOS PARCIALES'?'mid':st.t==='FINALIZADO'?'info':'bad')+'">'+st.t+'</div>'+
-    '<div class="pill void">MUESTRA '+p.muestra+'</div>';
+    '<div class="pill void">'+sampleText+'</div>';
 
   var tabs = $('d-tabs'); tabs.innerHTML='';
   GRUPOS.forEach(function(g){
