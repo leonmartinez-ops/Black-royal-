@@ -84,6 +84,16 @@
     .bottom-nav button{border-radius:17px;color:#77746d;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;display:grid;place-items:center;align-content:center;gap:4px}
     .bottom-nav button b{font-size:1rem;font-weight:500;line-height:1}.bottom-nav button.active{color:#15130f;background:var(--cream)}
     .analysis-progress{display:flex;align-items:center;gap:9px;padding:10px 2px;color:var(--muted);font-size:.65rem}.analysis-progress i{width:7px;height:7px;border-radius:50%;background:var(--gold)}
+    .exposure-strip{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:18px;background:rgba(20,20,17,.82);margin:0 0 24px;overflow:hidden}
+    .exposure-cell{padding:12px 10px;border-right:1px solid var(--line)}.exposure-cell:last-child{border-right:0}
+    .exposure-cell span{display:block;color:var(--muted);font-size:.52rem;letter-spacing:.09em;text-transform:uppercase}.exposure-cell b{display:block;font-size:.82rem;margin-top:5px;color:var(--cream)}
+    .exposure-cell.warn b{color:var(--orange)}
+    .stake-row{display:grid;grid-template-columns:1fr minmax(112px,145px);gap:12px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+    .stake-label b{display:block;font-size:.7rem}.stake-label small{display:block;color:var(--muted);font-size:.58rem;margin-top:3px;line-height:1.35}
+    .stake-field{height:42px;border:1px solid var(--line);border-radius:13px;background:#0d0d0b;display:flex;align-items:center;padding:0 10px;gap:4px;color:var(--gold);font-weight:800}
+    .stake-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:800 .88rem/1 -apple-system,BlinkMacSystemFont,system-ui;text-align:right}
+    .stake-locked{font-size:.66rem;text-align:right;color:var(--muted);line-height:1.35}.stake-locked b{color:var(--cream);display:block;font-size:.78rem}
+    .save-note{color:var(--green);font-size:.58rem;margin-top:7px;text-align:right;min-height:12px}
   </style>
 </head>
 <body>
@@ -93,6 +103,7 @@
       <img src="black-royal-logo.png" alt="Black Royal Sports Intelligence">
       <div class="live-dot" id="live-indicator"><i></i><span id="live-label">Actualizado</span></div>
     </header>
+    <div id="global-exposure" class="exposure-strip" aria-label="Resumen de banca"></div>
     <section class="view active" id="view-jornada">
       <div class="eyebrow">Liga MX · Apertura 2026</div>
       <h1 id="round-title">Jornada actual</h1>
@@ -136,6 +147,7 @@
   <section class="detail" id="detail" aria-hidden="true">
     <div class="detail-inner">
       <button class="back" id="back">‹ Jornada</button>
+      <div id="detail-exposure" class="exposure-strip" style="margin-top:14px"></div>
       <div id="detail-content"></div>
     </div>
   </section>
@@ -198,7 +210,7 @@
     function renderMatch(item){
       var cls=isLive(item)?'live':isFinished(item)?'finished':localDay(item.fixture.date)===localDay(new Date().toISOString())?'today':'';
       var score=isFinished(item)||isLive(item)?' · '+(item.goals.home==null?0:item.goals.home)+'–'+(item.goals.away==null?0:item.goals.away):'';
-      var top=opportunities(item.fixture.id)[0],signal=top?'<div class="match-signal">Mejor señal · '+esc(marketNames[top.id]||top.id)+' '+esc(top.selection)+'</div>':'';
+      var top=opportunities(item.fixture.id)[0],placed=fixtureExposure(item.fixture.id),signal=top?'<div class="match-signal">Mejor señal · '+esc(marketNames[top.id]||top.id)+' '+esc(top.selection)+(placed?' · Expuesto '+money(placed):'')+'</div>':placed?'<div class="match-signal">Expuesto '+money(placed)+'</div>':'';
       return '<button class="match" data-id="'+item.fixture.id+'">'+
         '<div class="crests"><img src="'+esc(item.teams.home.logo)+'" alt=""><img src="'+esc(item.teams.away.logo)+'" alt=""></div>'+
         '<div class="match-main"><div class="teams">'+esc(item.teams.home.name)+' vs '+esc(item.teams.away.name)+score+'</div>'+
@@ -227,7 +239,7 @@
     function renderOpportunityBoard(){
       var list=allCurrentOpportunities(),node=document.getElementById('opportunity-board');if(!node)return;
       if(!list.length){node.innerHTML='<div class="empty">Todavía no hay señales con evidencia suficiente en '+esc(friendlyRound(state.currentRound))+'. Black Royal no completará espacios con datos inventados.</div>';return;}
-      node.innerHTML=list.map(function(row,index){var f=row.fixture,o=row.opportunity;return '<button class="match board-match" data-id="'+f.fixture.id+'"><div class="status '+(o.risk<=8?'live':'today')+'">#'+(index+1)+'</div><div class="match-main"><div class="teams">'+esc(f.teams.home.name)+' vs '+esc(f.teams.away.name)+'</div><div class="meta">'+esc(marketNames[o.id]||o.id)+' · '+esc(o.selection)+' · '+esc(confidence(o))+'</div></div><div class="status">R '+o.risk+'</div></button>';}).join('');
+      node.innerHTML=list.map(function(row,index){var f=row.fixture,o=row.opportunity,amount=exposureAmount(f.fixture.id,o.id);return '<button class="match board-match" data-id="'+f.fixture.id+'"><div class="status '+(o.risk<=8?'live':'today')+'">#'+(index+1)+'</div><div class="match-main"><div class="teams">'+esc(f.teams.home.name)+' vs '+esc(f.teams.away.name)+'</div><div class="meta">'+esc(marketNames[o.id]||o.id)+' · '+esc(o.selection)+' · '+esc(confidence(o))+'</div></div><div class="status">'+(amount?money(amount):'R '+o.risk)+'</div></button>';}).join('');
       Array.prototype.forEach.call(node.querySelectorAll('.board-match'),function(btn){btn.onclick=function(){openFixture(Number(btn.dataset.id));};});
     }
     function showView(name){
@@ -236,6 +248,25 @@
       if(name==='oportunidades')renderOpportunityBoard();window.scrollTo(0,0);
     }
     function renderBank(){var saved=getPublic(),value=Number(saved.bankBalance);if(!isFinite(value)||value<0)value=10000;document.getElementById('bank-value').textContent=new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(value);document.getElementById('bank-input').value=value;}
+    function money(value){return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(value)||0);}
+    function exposureRecord(fixtureId,marketId){var saved=getPublic(),byFixture=saved.marketExposure&&saved.marketExposure[String(fixtureId)];return byFixture&&byFixture[marketId]||null;}
+    function exposureAmount(fixtureId,marketId){var record=exposureRecord(fixtureId,marketId);return Number(record&&typeof record==='object'?record.amount:record)||0;}
+    function fixtureExposure(fixtureId){var saved=getPublic(),rows=saved.marketExposure&&saved.marketExposure[String(fixtureId)]||{};return Object.keys(rows).reduce(function(sum,key){var row=rows[key];return sum+(Number(row&&typeof row==='object'?row.amount:row)||0);},0);}
+    function findFixture(fixtureId){
+      var id=Number(fixtureId),direct=state.fixtures.find(function(f){return Number(f.fixture.id)===id;});if(direct)return direct;
+      var archive=getPublic().roundArchive||{},rounds=Object.keys(archive);for(var i=0;i<rounds.length;i++){var found=(archive[rounds[i]].fixtures||[]).find(function(f){return Number(f.fixture.id)===id;});if(found)return found;}return null;
+    }
+    function openExposure(){
+      var saved=getPublic(),all=saved.marketExposure||{},total=0;Object.keys(all).forEach(function(fixtureId){var fixture=findFixture(fixtureId);if(fixture&&isFinished(fixture))return;total+=fixtureExposure(fixtureId);});return total;
+    }
+    function exposureSummaryMarkup(){var saved=getPublic(),bank=Number(saved.bankBalance);if(!isFinite(bank)||bank<0)bank=10000;var exposed=openExposure(),available=Math.max(0,bank-exposed);return '<div class="exposure-cell"><span>Banca</span><b>'+money(bank)+'</b></div><div class="exposure-cell '+(exposed>bank?'warn':'')+'"><span>Expuesto</span><b>'+money(exposed)+'</b></div><div class="exposure-cell"><span>Disponible</span><b>'+money(available)+'</b></div>';}
+    function renderExposureSummary(){var html=exposureSummaryMarkup();document.getElementById('global-exposure').innerHTML=html;document.getElementById('detail-exposure').innerHTML=html;renderBank();}
+    function saveMarketExposure(fixtureId,marketId,selection,amount){
+      var saved=getPublic(),bank=Number(saved.bankBalance);if(!isFinite(bank)||bank<0)bank=10000;if(!saved.marketExposure)saved.marketExposure={};if(!saved.marketExposure[String(fixtureId)])saved.marketExposure[String(fixtureId)]={};
+      var previous=exposureAmount(fixtureId,marketId),usedWithout=Math.max(0,openExposure()-previous),maximum=Math.max(0,bank-usedWithout),clean=Math.max(0,Math.min(Number(amount)||0,maximum));
+      if(clean===0)delete saved.marketExposure[String(fixtureId)][marketId];else saved.marketExposure[String(fixtureId)][marketId]={amount:clean,selection:selection,recordedAt:new Date().toISOString()};savePublic(saved);renderExposureSummary();renderMatchday();renderOpportunityBoard();return {amount:clean,limited:Number(amount)>maximum};
+    }
+    function bindStakeInputs(){Array.prototype.forEach.call(document.querySelectorAll('.stake-input'),function(input){input.onchange=function(){var result=saveMarketExposure(input.dataset.fixture,input.dataset.market,input.dataset.selection,input.value),note=input.closest('.stake-row').querySelector('.save-note');input.value=result.amount||'';note.textContent=result.limited?'Ajustado al saldo disponible':'Monto guardado';setTimeout(function(){note.textContent='';},1800);};});}
     function savedSnapshot(id){
       var saved=getSaved(), snap=saved.analysisByFixture&&saved.analysisByFixture[String(id)];
       return snap||null;
@@ -359,11 +390,12 @@
       return out.sort(function(a,b){return a.risk-b.risk||b.evidence-a.evidence||b.sample-a.sample;}).slice(0,10);
     }
     function confidence(o){return o.risk<=8&&o.evidence>=80?'Consistencia alta':o.risk<=25?'Cautela':'Evitar';}
-    function opportunityCard(o){
+    function opportunityCard(o,fixtureId,locked){
       var good=o.risk<=8&&o.evidence>=80,cls=good?'good':'caution';
       var why='Se analizaron '+o.sample+' partidos con datos disponibles. Mercado y señal RIS '+(o.risk<=8?'estaban prácticamente alineados.':'mostraban una diferencia que exige cautela.');
+      var amount=exposureAmount(fixtureId,o.id),stake=locked?'<div class="stake-row"><div class="stake-label"><b>Monto expuesto</b><small>Registro cerrado al iniciar el partido</small></div><div class="stake-locked">'+(amount?'<b>'+money(amount)+'</b>Registrado':'No registrado')+'</div></div>':'<div class="stake-row"><div class="stake-label"><b>Monto expuesto</b><small>Escribe cuánto colocaste en este mercado</small></div><div><div class="stake-field"><span>$</span><input class="stake-input" inputmode="decimal" data-fixture="'+fixtureId+'" data-market="'+esc(o.id)+'" data-selection="'+esc(o.selection)+'" value="'+(amount||'')+'" placeholder="0"></div><div class="save-note"></div></div></div>';
       return '<div class="opportunity"><div class="opp-top"><div class="opp-title"><b>'+esc(marketNames[o.id]||o.id)+' · '+esc(o.selection)+'</b><small>'+esc(why)+'</small></div><span class="badge '+cls+'">'+confidence(o)+'</span></div>'+
-        '<div class="facts"><span class="fact">Evidencia '+o.evidence+'%</span><span class="fact">Muestra '+o.sample+'</span><span class="fact">Riesgo relativo '+o.risk+'</span></div></div>';
+        '<div class="facts"><span class="fact">Evidencia '+o.evidence+'%</span><span class="fact">Muestra '+o.sample+'</span><span class="fact">Riesgo relativo '+o.risk+'</span></div>'+stake+'</div>';
     }
     function teamStats(detail,teamId){
       var rows=Array.isArray(detail.statistics)?detail.statistics:[],row=rows.find(function(r){return r.team&&r.team.id===teamId;});
@@ -393,10 +425,10 @@
         else if(o.id==='btts')outcome=((o.selection==='SÍ')===(hg>0&&ag>0))?'ACIERTO':'FALLO';
         else if(o.id==='1x2'&&snap)outcome=snap.selection1x2===result?'ACIERTO':'FALLO';
         else if(o.id==='dc'&&snap){var parts=String(snap.dcSide||'').split('/');outcome=parts.indexOf(result)>-1?'ACIERTO':'FALLO';}
-        rows.push({label:marketNames[o.id]||o.id,selection:o.selection,outcome:outcome});
+        rows.push({label:marketNames[o.id]||o.id,selection:o.selection,outcome:outcome,amount:exposureAmount(item.fixture.id,o.id)});
       });
       if(!rows.length)return '<div class="empty">No existe un snapshot prepartido verificable para comparar. Black Royal no reconstruye una predicción después del resultado.</div>';
-      return rows.map(function(r){var cls=r.outcome==='ACIERTO'?'good':r.outcome==='FALLO'?'fail':'pending';return '<div class="audit-row"><div><b>'+esc(r.label)+'</b><small>'+esc(r.selection)+'</small></div><span class="badge '+cls+'">'+r.outcome+'</span></div>';}).join('');
+      return rows.map(function(r){var cls=r.outcome==='ACIERTO'?'good':r.outcome==='FALLO'?'fail':'pending';return '<div class="audit-row"><div><b>'+esc(r.label)+'</b><small>'+esc(r.selection)+(r.amount?' · Monto '+money(r.amount):' · Sin monto registrado')+'</small></div><span class="badge '+cls+'">'+r.outcome+'</span></div>';}).join('');
     }
     function expectedNarrative(item,opps){
       var legacy=verifiedLegacy[String(item.fixture.id)];if(legacy&&legacy.summary)return {title:legacy.summary,reason:legacy.reason};
@@ -409,11 +441,12 @@
       var html='<div class="hero"><div class="eyebrow">'+esc(statusLabel(item))+'</div>'+title+'<div class="hero-meta">'+esc(mxDate(item.fixture.date))+' · '+esc(mxTime(item.fixture.date))+'<br>'+esc(fixtureVenue(item))+'</div></div>';
       if(live){html+='<div class="card"><div class="card-title">Qué está ocurriendo</div><p class="narrative">Datos en vivo · '+esc(item.fixture.status.elapsed||0)+' minutos</p><div class="stats">'+(stats||'<div class="reason">Las estadísticas detalladas todavía no están disponibles.</div>')+'</div></div>';}
       html+='<div class="card"><div class="card-title">'+(finished?'Lo que Black Royal esperaba':'Qué espera Black Royal')+'</div><p class="narrative">'+esc(n.title)+'</p><p class="reason">'+esc(n.reason)+'</p></div>';
-      html+='<div class="card"><div class="card-title">'+(opps.length?'Oportunidades detectadas':'Evidencia disponible')+'</div>'+(opps.length?opps.map(opportunityCard).join(''):'<div class="empty">SIN EVIDENCIA SUFICIENTE</div>')+'</div>';
+      html+='<div class="card"><div class="card-title">'+(opps.length?'Oportunidades detectadas':'Evidencia disponible')+'</div>'+(opps.length?opps.map(function(o){return opportunityCard(o,item.fixture.id,live||finished);}).join(''):'<div class="empty">SIN EVIDENCIA SUFICIENTE</div>')+'</div>';
       if(finished)html+='<div class="card"><div class="card-title">Pronóstico vs resultado</div>'+audit(item,detail,opps)+'</div>';
       html+='<div class="card"><button class="technical" id="tech-toggle">Ver análisis RIS</button><div class="tech-body hidden" id="tech-body">Mercado = probabilidad implícita disponible. Señal RIS = lectura histórica del modelo. Riesgo relativo = separación entre ambas lecturas. Evidencia y muestra se muestran únicamente cuando fueron guardadas antes del partido.</div></div>';
       html+='<p class="disclaimer">Black Royal es una herramienta analítica y educativa. No coloca apuestas, no garantiza resultados y no modifica retrospectivamente sus análisis.</p>';
       document.getElementById('detail-content').innerHTML=html;
+      bindStakeInputs();renderExposureSummary();
       var toggle=document.getElementById('tech-toggle');if(toggle)toggle.onclick=function(){document.getElementById('tech-body').classList.toggle('hidden');};
     }
     function openFixture(id){
@@ -427,7 +460,7 @@
     function closeDetail(){var p=document.getElementById('detail');p.classList.remove('on');p.setAttribute('aria-hidden','true');document.body.style.overflow='';state.selected=null;}
     function mergeLive(live){
       var byId={};live.forEach(function(f){byId[f.fixture.id]=f;});state.fixtures=state.fixtures.map(function(f){return byId[f.fixture.id]||f;});renderMatchday();
-      if(state.currentRound)archiveRound(state.currentRound,state.fixtures);
+      if(state.currentRound)archiveRound(state.currentRound,state.fixtures);renderExposureSummary();
       if(state.selected&&byId[state.selected])api('fixtures',{id:state.selected}).then(function(d){renderDetail(byId[state.selected],d.response&&d.response[0]||byId[state.selected]);});
     }
     function pollLive(){
@@ -444,7 +477,7 @@
       if(!round)return;state.analysisToken++;state.analysisRunning=false;state.currentRound=round;renderRoundControl();document.getElementById('matchday').innerHTML='<div class="loader"><i></i>Cargando partidos…</div>';
       return api('fixtures',{league:LEAGUE,season:SEASON,round:round}).then(function(data){
         var rows=Array.isArray(data.response)?data.response:[];if(!rows.length)throw new Error('Sin partidos');
-        state.fixtures=rows.slice().sort(function(a,b){return new Date(a.fixture.date)-new Date(b.fixture.date);});archiveRound(round,state.fixtures);renderMatchday();renderOpportunityBoard();analyzeRoundAutomatically();
+        state.fixtures=rows.slice().sort(function(a,b){return new Date(a.fixture.date)-new Date(b.fixture.date);});archiveRound(round,state.fixtures);renderExposureSummary();renderMatchday();renderOpportunityBoard();analyzeRoundAutomatically();
       }).catch(function(){
         var cached=archivedRound(round);if(cached&&cached.length){state.fixtures=cached;renderMatchday();renderOpportunityBoard();return;}
         state.fixtures=[];document.getElementById('matchday').innerHTML='<div class="error">No pudimos cargar esta jornada y todavía no existe una copia guardada. Black Royal no mostrará partidos simulados.</div>';
@@ -471,10 +504,10 @@
     document.getElementById('round-prev').onclick=function(){var i=state.rounds.indexOf(state.currentRound);if(i>0)setRound(state.rounds[i-1]);};
     document.getElementById('round-next').onclick=function(){var i=state.rounds.indexOf(state.currentRound);if(i>-1&&i<state.rounds.length-1)setRound(state.rounds[i+1]);};
     Array.prototype.forEach.call(document.querySelectorAll('.bottom-nav button'),function(btn){btn.onclick=function(){showView(btn.dataset.view);};});
-    document.getElementById('bank-save').onclick=function(){var value=Number(String(document.getElementById('bank-input').value).replace(/[^0-9.]/g,''));if(!isFinite(value)||value<0)return;publicPatch({bankBalance:value,bankUpdatedAt:new Date().toISOString()});renderBank();};
+    document.getElementById('bank-save').onclick=function(){var value=Number(String(document.getElementById('bank-input').value).replace(/[^0-9.]/g,''));if(!isFinite(value)||value<0)return;publicPatch({bankBalance:value,bankUpdatedAt:new Date().toISOString()});renderExposureSummary();};
     document.addEventListener('visibilitychange',function(){if(!document.hidden)pollLive();});
     window.addEventListener('load',function(){setTimeout(function(){document.getElementById('splash').classList.add('done');},1850);});
-    renderBank();loadRound();
+    renderExposureSummary();loadRound();
   })();
   </script>
 </body>
