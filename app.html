@@ -94,6 +94,13 @@
     .stake-field input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:800 .88rem/1 -apple-system,BlinkMacSystemFont,system-ui;text-align:right}
     .stake-locked{font-size:.66rem;text-align:right;color:var(--muted);line-height:1.35}.stake-locked b{color:var(--cream);display:block;font-size:.78rem}
     .save-note{color:var(--green);font-size:.58rem;margin-top:7px;text-align:right;min-height:12px}
+    .market-row{display:grid;grid-template-columns:minmax(0,1fr) 128px;gap:12px;align-items:start}
+    .market-amount .stake-field{height:44px}.market-amount .save-note{margin-top:4px}
+    .market-amount-label{display:block;text-align:right;color:var(--muted);font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+    .market-state{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:9px}
+    .match-total{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:15px;padding:15px;border-radius:15px;background:rgba(201,164,92,.08);border:1px solid rgba(201,164,92,.2)}
+    .match-total span{color:var(--muted);font-size:.65rem}.match-total b{font-size:1rem;color:var(--gold)}
+    @media(max-width:360px){.market-row{grid-template-columns:minmax(0,1fr) 112px}.stake-field{padding:0 7px}}
   </style>
 </head>
 <body>
@@ -259,14 +266,14 @@
     function openExposure(){
       var saved=getPublic(),all=saved.marketExposure||{},total=0;Object.keys(all).forEach(function(fixtureId){var fixture=findFixture(fixtureId);if(fixture&&isFinished(fixture))return;total+=fixtureExposure(fixtureId);});return total;
     }
-    function exposureSummaryMarkup(){var saved=getPublic(),bank=Number(saved.bankBalance);if(!isFinite(bank)||bank<0)bank=10000;var exposed=openExposure(),available=Math.max(0,bank-exposed);return '<div class="exposure-cell"><span>Banca</span><b>'+money(bank)+'</b></div><div class="exposure-cell '+(exposed>bank?'warn':'')+'"><span>Expuesto</span><b>'+money(exposed)+'</b></div><div class="exposure-cell"><span>Disponible</span><b>'+money(available)+'</b></div>';}
+    function exposureSummaryMarkup(){var saved=getPublic(),bank=Number(saved.bankBalance);if(!isFinite(bank)||bank<0)bank=10000;var exposed=openExposure(),available=Math.max(0,bank-exposed);return '<div class="exposure-cell"><span>Banca</span><b>'+money(bank)+'</b></div><div class="exposure-cell '+(exposed>bank?'warn':'')+'"><span>Total colocado</span><b>'+money(exposed)+'</b></div><div class="exposure-cell"><span>Disponible</span><b>'+money(available)+'</b></div>';}
     function renderExposureSummary(){var html=exposureSummaryMarkup();document.getElementById('global-exposure').innerHTML=html;document.getElementById('detail-exposure').innerHTML=html;renderBank();}
     function saveMarketExposure(fixtureId,marketId,selection,amount){
       var saved=getPublic(),bank=Number(saved.bankBalance);if(!isFinite(bank)||bank<0)bank=10000;if(!saved.marketExposure)saved.marketExposure={};if(!saved.marketExposure[String(fixtureId)])saved.marketExposure[String(fixtureId)]={};
       var previous=exposureAmount(fixtureId,marketId),usedWithout=Math.max(0,openExposure()-previous),maximum=Math.max(0,bank-usedWithout),clean=Math.max(0,Math.min(Number(amount)||0,maximum));
       if(clean===0)delete saved.marketExposure[String(fixtureId)][marketId];else saved.marketExposure[String(fixtureId)][marketId]={amount:clean,selection:selection,recordedAt:new Date().toISOString()};savePublic(saved);renderExposureSummary();renderMatchday();renderOpportunityBoard();return {amount:clean,limited:Number(amount)>maximum};
     }
-    function bindStakeInputs(){Array.prototype.forEach.call(document.querySelectorAll('.stake-input'),function(input){input.onchange=function(){var result=saveMarketExposure(input.dataset.fixture,input.dataset.market,input.dataset.selection,input.value),note=input.closest('.stake-row').querySelector('.save-note');input.value=result.amount||'';note.textContent=result.limited?'Ajustado al saldo disponible':'Monto guardado';setTimeout(function(){note.textContent='';},1800);};});}
+    function bindStakeInputs(){Array.prototype.forEach.call(document.querySelectorAll('.stake-input'),function(input){input.onchange=function(){var result=saveMarketExposure(input.dataset.fixture,input.dataset.market,input.dataset.selection,input.value),note=input.closest('.market-amount').querySelector('.save-note'),total=document.getElementById('fixture-total-'+input.dataset.fixture);input.value=result.amount||'';if(total)total.textContent=money(fixtureExposure(input.dataset.fixture));note.textContent=result.limited?'Ajustado al saldo disponible':'Monto guardado';setTimeout(function(){note.textContent='';},1800);};});}
     function savedSnapshot(id){
       var saved=getSaved(), snap=saved.analysisByFixture&&saved.analysisByFixture[String(id)];
       return snap||null;
@@ -393,9 +400,9 @@
     function opportunityCard(o,fixtureId,locked){
       var good=o.risk<=8&&o.evidence>=80,cls=good?'good':'caution';
       var why='Se analizaron '+o.sample+' partidos con datos disponibles. Mercado y señal RIS '+(o.risk<=8?'estaban prácticamente alineados.':'mostraban una diferencia que exige cautela.');
-      var amount=exposureAmount(fixtureId,o.id),stake=locked?'<div class="stake-row"><div class="stake-label"><b>Monto expuesto</b><small>Registro cerrado al iniciar el partido</small></div><div class="stake-locked">'+(amount?'<b>'+money(amount)+'</b>Registrado':'No registrado')+'</div></div>':'<div class="stake-row"><div class="stake-label"><b>Monto expuesto</b><small>Escribe cuánto colocaste en este mercado</small></div><div><div class="stake-field"><span>$</span><input class="stake-input" inputmode="decimal" data-fixture="'+fixtureId+'" data-market="'+esc(o.id)+'" data-selection="'+esc(o.selection)+'" value="'+(amount||'')+'" placeholder="0"></div><div class="save-note"></div></div></div>';
-      return '<div class="opportunity"><div class="opp-top"><div class="opp-title"><b>'+esc(marketNames[o.id]||o.id)+' · '+esc(o.selection)+'</b><small>'+esc(why)+'</small></div><span class="badge '+cls+'">'+confidence(o)+'</span></div>'+
-        '<div class="facts"><span class="fact">Evidencia '+o.evidence+'%</span><span class="fact">Muestra '+o.sample+'</span><span class="fact">Riesgo relativo '+o.risk+'</span></div>'+stake+'</div>';
+      var amount=exposureAmount(fixtureId,o.id),stake=locked?'<div class="market-amount"><span class="market-amount-label">Monto colocado</span><div class="stake-locked">'+(amount?'<b>'+money(amount)+'</b>Registrado':'No registrado')+'</div></div>':'<div class="market-amount"><span class="market-amount-label">Monto colocado</span><div class="stake-field"><span>$</span><input class="stake-input" inputmode="decimal" data-fixture="'+fixtureId+'" data-market="'+esc(o.id)+'" data-selection="'+esc(o.selection)+'" value="'+(amount||'')+'" placeholder="0"></div><div class="save-note"></div></div>';
+      return '<div class="opportunity"><div class="market-row"><div class="opp-title"><b>'+esc(marketNames[o.id]||o.id)+'</b><small>'+esc(o.selection)+'</small></div>'+stake+'</div><div class="market-state"><span class="badge '+cls+'">'+confidence(o)+'</span></div><div class="opp-copy">'+esc(why)+'</div>'+
+        '<div class="facts"><span class="fact">Evidencia '+o.evidence+'%</span><span class="fact">Muestra '+o.sample+'</span><span class="fact">Riesgo relativo '+o.risk+'</span></div></div>';
     }
     function teamStats(detail,teamId){
       var rows=Array.isArray(detail.statistics)?detail.statistics:[],row=rows.find(function(r){return r.team&&r.team.id===teamId;});
@@ -441,7 +448,7 @@
       var html='<div class="hero"><div class="eyebrow">'+esc(statusLabel(item))+'</div>'+title+'<div class="hero-meta">'+esc(mxDate(item.fixture.date))+' · '+esc(mxTime(item.fixture.date))+'<br>'+esc(fixtureVenue(item))+'</div></div>';
       if(live){html+='<div class="card"><div class="card-title">Qué está ocurriendo</div><p class="narrative">Datos en vivo · '+esc(item.fixture.status.elapsed||0)+' minutos</p><div class="stats">'+(stats||'<div class="reason">Las estadísticas detalladas todavía no están disponibles.</div>')+'</div></div>';}
       html+='<div class="card"><div class="card-title">'+(finished?'Lo que Black Royal esperaba':'Qué espera Black Royal')+'</div><p class="narrative">'+esc(n.title)+'</p><p class="reason">'+esc(n.reason)+'</p></div>';
-      html+='<div class="card"><div class="card-title">'+(opps.length?'Oportunidades detectadas':'Evidencia disponible')+'</div>'+(opps.length?opps.map(function(o){return opportunityCard(o,item.fixture.id,live||finished);}).join(''):'<div class="empty">SIN EVIDENCIA SUFICIENTE</div>')+'</div>';
+      html+='<div class="card"><div class="card-title">'+(opps.length?'Oportunidades detectadas':'Evidencia disponible')+'</div>'+(opps.length?opps.map(function(o){return opportunityCard(o,item.fixture.id,live||finished);}).join(''):'<div class="empty">SIN EVIDENCIA SUFICIENTE</div>')+(opps.length?'<div class="match-total"><span>Total colocado en este partido</span><b id="fixture-total-'+item.fixture.id+'">'+money(fixtureExposure(item.fixture.id))+'</b></div>':'')+'</div>';
       if(finished)html+='<div class="card"><div class="card-title">Pronóstico vs resultado</div>'+audit(item,detail,opps)+'</div>';
       html+='<div class="card"><button class="technical" id="tech-toggle">Ver análisis RIS</button><div class="tech-body hidden" id="tech-body">Mercado = probabilidad implícita disponible. Señal RIS = lectura histórica del modelo. Riesgo relativo = separación entre ambas lecturas. Evidencia y muestra se muestran únicamente cuando fueron guardadas antes del partido.</div></div>';
       html+='<p class="disclaimer">Black Royal es una herramienta analítica y educativa. No coloca apuestas, no garantiza resultados y no modifica retrospectivamente sus análisis.</p>';
