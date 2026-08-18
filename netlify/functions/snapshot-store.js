@@ -12,9 +12,8 @@ const validFixture = (value) => /^\d{5,12}$/.test(String(value || ""));
 exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS") return reply(204, {});
   const { getStore } = await import("@netlify/blobs");
-  const store = getStore({ name: "black-royal-pregame", consistency: "strong" });
-
   try {
+    const store = getStore({ name: "black-royal-pregame", consistency: "strong" });
     if (event.httpMethod === "GET") {
       const params = event.queryStringParameters || {};
       if (!validRound(params.round)) return reply(400, { error: "Jornada inválida" });
@@ -49,6 +48,10 @@ exports.handler = async function (event) {
     await store.setJSON(key, entry);
     return reply(201, { stored: true, immutable: true, entry });
   } catch (error) {
+    if (error && error.name === "MissingBlobsEnvironmentError") {
+      if (event.httpMethod === "GET") return reply(200, { entries: [], storage: "not-configured" });
+      return reply(503, { error: "El almacenamiento central de snapshots todavía no está configurado en este sitio." });
+    }
     return reply(500, { error: "No se pudo acceder al registro de snapshots", message: error.message });
   }
 };
