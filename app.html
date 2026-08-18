@@ -124,6 +124,7 @@
     .track-only{margin-top:11px;color:var(--muted);font-size:.61rem;line-height:1.45}.optional-stake{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:9px}.optional-stake .mini-field input{height:44px}.optional-stake .save-operation{height:44px}
     .pitch-wrap{margin-top:13px;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,#173e29,#0e2d1c);border:1px solid rgba(121,217,155,.2);position:relative}.pitch-svg{display:block;width:100%;height:auto;opacity:.72}.pitch-overlay{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;align-items:center;text-align:center;padding:20px 17px}.pitch-team{display:grid;gap:7px}.pitch-team b{font-size:.72rem}.pitch-team strong{font-family:Georgia,"Times New Roman",serif;font-size:2rem}.pitch-team small{color:rgba(255,255,255,.72);font-size:.55rem;line-height:1.55}.pitch-legend{font-size:.56rem;color:var(--muted);line-height:1.45;margin-top:8px;text-align:center}
     .simulation-card{border:1px solid rgba(201,164,92,.32);border-radius:22px;background:linear-gradient(145deg,rgba(37,32,22,.96),rgba(16,16,14,.94));padding:19px;margin:0 0 20px;box-shadow:0 18px 42px rgba(0,0,0,.22)}
+    .season-grid{display:grid;gap:10px;margin-top:18px}.season-round{width:100%;display:grid;grid-template-columns:50px minmax(0,1fr) auto;gap:13px;align-items:center;text-align:left;padding:15px;border:1px solid var(--line);border-radius:18px;background:rgba(20,20,17,.82)}.season-round:active{transform:scale(.985)}.season-number{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:rgba(201,164,92,.09);color:var(--gold);font:500 1.3rem/1 Georgia,serif}.season-copy b{display:block;font-size:.85rem}.season-copy small{display:block;color:var(--muted);font-size:.59rem;line-height:1.45;margin-top:4px}.season-state{font-size:.51rem;letter-spacing:.09em;text-transform:uppercase;padding:7px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.season-state.current{color:var(--gold);border-color:rgba(201,164,92,.35);background:rgba(201,164,92,.08)}.season-state.done{color:var(--green);border-color:rgba(121,217,155,.28)}.season-back{min-height:44px;padding:0 14px;margin-bottom:18px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.04);font-size:.68rem}.season-baseline{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:14px 0 0;padding:13px 14px;border:1px solid rgba(201,164,92,.24);border-radius:16px;background:rgba(201,164,92,.06)}.season-baseline span{font-size:.58rem;color:var(--muted);line-height:1.4}.season-baseline b{color:var(--gold);font-size:.82rem;white-space:nowrap}
     .simulation-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.simulation-head h2{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:1.55rem;line-height:1.05;letter-spacing:-.04em;margin:6px 0 7px}.simulation-tag{flex:none;font-size:.5rem;line-height:1.25;letter-spacing:.09em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(201,164,92,.3);background:rgba(201,164,92,.08);padding:7px 8px;border-radius:999px}
     .simulation-copy{font-size:.68rem;line-height:1.5;color:var(--muted);margin:0}.simulation-value{font-family:Georgia,"Times New Roman",serif;font-size:2.55rem;letter-spacing:-.045em;margin:17px 0 2px}.simulation-caption{font-size:.56rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
     .simulation-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:15px}.simulation-metric{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:11px;background:rgba(255,255,255,.025)}.simulation-metric span{display:block;color:var(--muted);font-size:.49rem;line-height:1.35;letter-spacing:.08em;text-transform:uppercase}.simulation-metric b{display:block;font-size:.9rem;margin-top:5px}.simulation-score{display:grid;grid-template-columns:repeat(3,1fr);margin-top:13px;border:1px solid var(--line);border-radius:15px;overflow:hidden}.simulation-score div{text-align:center;padding:10px 6px;border-right:1px solid var(--line)}.simulation-score div:last-child{border:0}.simulation-score b{display:block;font-size:1rem}.simulation-score span{display:block;color:var(--muted);font-size:.47rem;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
@@ -138,11 +139,19 @@
       <img src="black-royal-logo.png" alt="Black Royal Sports Intelligence">
       <div class="live-dot" id="live-indicator"><i></i><span id="live-label">Actualizado</span></div>
     </header>
-    <div id="global-exposure" class="exposure-strip" aria-label="Resumen de banca"></div>
-    <section class="view active" id="view-jornada">
+    <section class="view active" id="view-temporada">
+      <div id="season-overview">
+        <div class="eyebrow">Liga MX · Apertura 2026</div>
+        <h1>Toda la temporada</h1>
+        <p class="lead">Consulta cada jornada, sus partidos y el rendimiento de las predicciones. La banca vive aparte, en la última sección.</p>
+        <div class="season-baseline"><span>Inicio de la simulación<br>Jornada 4</span><b>$10,000 MXN</b></div>
+        <div id="season-grid" class="season-grid"><div class="loader"><i></i>Cargando temporada…</div></div>
+      </div>
+      <div id="round-panel" class="hidden">
+      <button class="season-back" id="season-back">‹ Toda la temporada</button>
       <div class="eyebrow">Liga MX · Apertura 2026</div>
       <h1 id="round-title">Jornada actual</h1>
-      <p class="lead">Elige un partido. Te diremos en palabras sencillas qué se espera y cuáles mercados tienen respaldo real.</p>
+      <p class="lead">Elige un partido para revisar sus predicciones, evolución y resultado.</p>
       <div class="round-control">
         <button id="round-prev" aria-label="Jornada anterior">‹</button>
         <select class="round-select" id="round-select" aria-label="Seleccionar jornada"><option>Cargando jornada…</option></select>
@@ -150,8 +159,8 @@
       </div>
       <div id="analysis-progress" class="analysis-progress hidden"><i></i><span>Preparando análisis de la jornada…</span></div>
       <div id="round-summary"></div>
-      <div id="retrospective-simulation"><div class="simulation-loading">Preparando la simulación retrospectiva con cuotas verificadas…</div></div>
       <div id="matchday"><div class="loader"><i></i>Cargando los nueve partidos…</div></div>
+      </div>
     </section>
 
     <section class="view" id="view-oportunidades">
@@ -165,14 +174,15 @@
       <div class="eyebrow">Registro personal</div>
       <h1>Mi banca</h1>
       <p class="lead">Un diario para medir crecimiento y pérdidas con calma. No recomienda cuánto apostar.</p>
+      <div class="season-baseline"><span>Capital inicial fijado<br>Jornada 4</span><b>$10,000 MXN</b></div>
       <div class="bank-card">
         <div class="eyebrow">Banca actual calculada</div>
         <div class="bank-value" id="bank-value">$10,000</div>
         <p>La banca actual cambia con los resultados registrados. Sólo modifica abajo tu capital inicial cuando exista un depósito o retiro real.</p>
         <div id="bank-metrics" class="bank-metrics"></div>
         <div id="bank-progress" class="bank-progress"><i></i></div>
-        <div class="bank-input"><input id="bank-input" inputmode="decimal" value="10000" aria-label="Capital inicial"><button id="bank-save">Guardar capital inicial</button></div>
       </div>
+      <div class="subsection-title">Simulación desde Jornada 4</div><div id="retrospective-simulation"><div class="simulation-loading">Preparando la simulación retrospectiva con cuotas verificadas…</div></div>
       <div class="subsection-title">Evolución registrada</div><div id="bank-curve"></div>
       <div class="subsection-title">Operaciones pendientes</div><div id="ledger-pending" class="ledger"></div>
       <div class="subsection-title">Historial de resultados</div><div id="ledger-history" class="ledger"></div>
@@ -180,7 +190,7 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Navegación principal">
-    <button class="active" data-view="jornada"><b>◷</b>Jornada</button>
+    <button class="active" data-view="temporada"><b>◷</b>Temporada</button>
     <button data-view="oportunidades"><b>♕</b>Señales</button>
     <button data-view="banca"><b>↗</b>Banca</button>
   </nav>
@@ -188,7 +198,6 @@
   <section class="detail" id="detail" aria-hidden="true">
     <div class="detail-inner">
       <button class="back" id="back">‹ Jornada</button>
-      <div id="detail-exposure" class="exposure-strip" style="margin-top:14px"></div>
       <div id="detail-content"></div>
     </div>
   </section>
@@ -197,10 +206,10 @@
   (function(){
     'use strict';
     var API='/.netlify/functions/api-football';
-    var LEAGUE=262, SEASON=2026, FALLBACK_ROUND='Apertura - 4';
+    var LEAGUE=262, SEASON=2026, FALLBACK_ROUND='Apertura - 4', SIMULATION_START_ROUND=4, SIMULATION_START_CAPITAL=10000;
     var LIVE_STATUSES=['1H','HT','2H','ET','BT','P','SUSP','INT','LIVE'];
     var FINISHED_STATUSES=['FT','AET','PEN'];
-    var state={fixtures:[],details:{},selected:null,liveTimer:null,lastUpdated:null,rounds:[],currentRound:null,view:'jornada',analysisRunning:false,analysisToken:0,oddsSyncing:false};
+    var state={fixtures:[],details:{},selected:null,liveTimer:null,lastUpdated:null,rounds:[],currentRound:null,view:'temporada',analysisRunning:false,analysisToken:0,oddsSyncing:false};
     var marketNames={
       '1x2':'Resultado 1X2',dc:'Doble oportunidad',h1:'Primera mitad',h2:'Segunda mitad',
       btts:'Ambos equipos anotan',ou15:'Goles 1.5',ou25:'Goles 2.5',tot:'Total de goles',
@@ -269,6 +278,14 @@
       ind.classList.toggle('on',anyLive);document.getElementById('live-label').textContent=anyLive?'Datos en vivo':'Actualizado';
       renderRoundSummary();
     }
+    function renderSeasonOverview(){
+      var node=document.getElementById('season-grid');if(!node)return;var archive=getPublic().roundArchive||{},currentNumber=roundNumber(state.currentRound);
+      if(!state.rounds.length){node.innerHTML='<div class="empty">No pudimos cargar las jornadas de la temporada.</div>';return;}
+      node.innerHTML=state.rounds.map(function(round){var number=roundNumber(round),saved=archive[round],fixtures=saved&&saved.fixtures||[],finished=fixtures.length&&fixtures.every(isFinished),isCurrent=round===state.currentRound,label=finished?'Finalizada':isCurrent?'En curso':number<currentNumber?'Jugado':'Próxima',cls=finished?'done':isCurrent?'current':'';
+        return '<button class="season-round" data-round="'+esc(round)+'"><span class="season-number">'+number+'</span><span class="season-copy"><b>'+esc(friendlyRound(round))+'</b><small>'+(fixtures.length?fixtures.length+' partidos guardados':'Calendario de la temporada')+(number===SIMULATION_START_ROUND?' · Inicio de simulación':'')+'</small></span><span class="season-state '+cls+'">'+label+'</span></button>';
+      }).join('');
+      Array.prototype.forEach.call(node.querySelectorAll('.season-round'),function(button){button.onclick=function(){document.getElementById('season-overview').classList.add('hidden');document.getElementById('round-panel').classList.remove('hidden');setRound(button.dataset.round).then(function(){window.scrollTo(0,0);});};});
+    }
     function predictionOutcome(item,detail,o){
       detail=detail||item;var finished=isFinished(detail),live=isLive(detail),status=statusOf(detail);if(!live&&!finished)return 'pending';
       var h=teamStats(detail,detail.teams.home.id),a=teamStats(detail,detail.teams.away.id),hg=num(detail.goals&&detail.goals.home),ag=num(detail.goals&&detail.goals.away);if(hg==null||ag==null){hg=0;ag=0;}
@@ -297,14 +314,14 @@
     function renderRetrospectiveSimulation(){
       var node=document.getElementById('retrospective-simulation');if(!node)return;if(state.oddsSyncing){node.innerHTML='<div class="simulation-loading"><div class="loader"><i></i>Recuperando cuotas históricas reales y su casa de origen…</div></div>';return;}
       var rows=simulationRows();if(!rows.length){node.innerHTML='<div class="simulation-loading">La simulación aparecerá cuando existan predicciones prepartido verificables. Black Royal no reconstruirá selecciones después del resultado.</div>';return;}
-      var capital=10000,resolved=rows.filter(function(r){return r.state==='won'||r.state==='lost'||r.state==='void';}),evaluable=resolved.filter(function(r){return r.odd>1;}),missing=resolved.length-evaluable.length;if(!resolved.length){node.innerHTML='<div class="simulation-loading">Todavía no existen resultados terminados para calcular el balance de $10,000. Los mercados pendientes tienen $0 asignados.</div>';return;}
+      var capital=SIMULATION_START_CAPITAL,resolved=rows.filter(function(r){return r.state==='won'||r.state==='lost'||r.state==='void';}),evaluable=resolved.filter(function(r){return r.odd>1;}),missing=resolved.length-evaluable.length;if(roundNumber(state.currentRound)<SIMULATION_START_ROUND){node.innerHTML='<div class="simulation-loading">La simulación comienza en la Jornada 4 con $10,000. Las jornadas anteriores se muestran como historial deportivo y no modifican la banca.</div>';return;}if(!resolved.length){node.innerHTML='<div class="simulation-loading">Todavía no existen resultados terminados para calcular el balance de $10,000. Los mercados pendientes tienen $0 asignados.</div>';return;}
       var stake=capital/resolved.length,profit=0,won=0,lost=0,pending=0,voids=0,unknownWins=0;
       rows.forEach(function(r){if(r.state==='won'){won++;if(r.odd>1)profit+=stake*(r.odd-1);else unknownWins++;}else if(r.state==='lost'){lost++;profit-=stake;}else if(r.state==='void')voids++;else pending++;});
       var exact=unknownWins===0,provisional=capital+profit,roi=capital?profit/capital*100:0,byGame=[],marketMap={};
       rows.forEach(function(r){var id=r.key||r.label;if(!marketMap[id])marketMap[id]={label:marketNames[r.key]||r.label,won:0,lost:0,pending:0,quoted:0,profit:0};var m=marketMap[id];if(r.state==='won')m.won++;else if(r.state==='lost')m.lost++;else m.pending++;if(r.state==='pending')return;if(r.odd>1)m.quoted++;if(r.state==='won'&&r.odd>1)m.profit+=stake*(r.odd-1);else if(r.state==='lost')m.profit-=stake;});
       state.fixtures.forEach(function(item){var gameRows=rows.filter(function(r){return String(r.item.fixture.id)===String(item.fixture.id);});if(!gameRows.length)return;var gp=0,gwon=0,glost=0,gpending=0,quoted=0;gameRows.forEach(function(r){if(r.state==='won')gwon++;else if(r.state==='lost')glost++;else if(r.state==='pending')gpending++;if(r.state==='pending')return;if(r.odd>1)quoted++;if(r.state==='won'&&r.odd>1)gp+=stake*(r.odd-1);else if(r.state==='lost')gp-=stake;});byGame.push({item:item,profit:gp,won:gwon,lost:glost,pending:gpending,quoted:quoted,total:gwon+glost});});
       var tone=profit>0?'positive':profit<0?'negative':'',headline=exact?'Saldo simulado de los partidos terminados':'Saldo parcial: faltan cuotas ganadoras',statusCopy=won+' aciertos · '+lost+' fallos',marketDetails=Object.keys(marketMap).map(function(k){return marketMap[k];}).sort(function(a,b){return b.profit-a.profit;}).map(function(m){return '<div class="simulation-game"><div><b>'+esc(m.label)+'</b><small>'+m.won+' aciertos · '+m.lost+' fallos · '+m.pending+' pendientes · cuotas resueltas '+m.quoted+'/'+(m.won+m.lost)+'</small></div><strong class="'+(m.profit>0?'positive':m.profit<0?'negative':'')+'">'+(m.profit>=0?'+':'')+preciseMoney(m.profit)+'</strong></div>';}).join(''),details=byGame.map(function(g){return '<div class="simulation-game"><div><b>'+esc(g.item.teams.home.name)+' vs '+esc(g.item.teams.away.name)+'</b><small>'+g.won+' aciertos · '+g.lost+' fallos · '+g.pending+' pendientes · cuotas resueltas '+g.quoted+'/'+g.total+'</small></div><strong class="'+(g.profit>0?'positive':g.profit<0?'negative':'')+'">'+(g.profit>=0?'+':'')+preciseMoney(g.profit)+'</strong></div>';}).join('');
-      node.innerHTML='<div class="simulation-card"><div class="simulation-head"><div><div class="eyebrow">Simulación retrospectiva</div><h2>¿Qué habría pasado con $10,000?</h2></div><span class="simulation-tag">Sin dinero real</span></div><p class="simulation-copy">Los $10,000 se dividen únicamente entre las '+resolved.length+' predicciones ya resueltas. Los '+pending+' mercados pendientes tienen $0 asignados.</p><div class="simulation-value '+tone+'">'+preciseMoney(provisional)+'</div><div class="simulation-caption">'+headline+' · '+statusCopy+'</div><div class="simulation-metrics"><div class="simulation-metric"><span>Monto por resultado resuelto</span><b>'+preciseMoney(stake)+'</b></div><div class="simulation-metric"><span>Ganancia / pérdida</span><b class="'+tone+'">'+(profit>=0?'+':'')+preciseMoney(profit)+'</b></div><div class="simulation-metric"><span>ROI del corte actual</span><b class="'+tone+'">'+(roi>=0?'+':'')+roi.toFixed(2)+'%</b></div><div class="simulation-metric"><span>Pendientes excluidos</span><b>$0.00 · '+pending+' mercados</b></div></div><div class="simulation-score"><div><b class="positive">'+won+'</b><span>Aciertos</span></div><div><b class="negative">'+lost+'</b><span>Fallos</span></div><div><b>'+pending+'</b><span>Sin monto</span></div></div><details class="simulation-details"><summary>Rendimiento por mercado</summary>'+marketDetails+'</details><details class="simulation-details"><summary>Ver resultado por partido</summary>'+details+'</details><p class="simulation-note">Balance calculado sólo con '+resolved.length+' resultados: '+evaluable.length+' tienen cuota histórica verificable'+(missing?' · '+missing+' sin cuota recuperada':'')+'. Los pendientes no participan en este corte. Las cuotas provienen de API-Football y conservan casa y hora; no se alteran las predicciones originales.</p></div>';
+      node.innerHTML='<div class="simulation-card"><div class="simulation-head"><div><div class="eyebrow">Simulación desde Jornada 4</div><h2>Temporada iniciada con $10,000</h2></div><span class="simulation-tag">Sin dinero real</span></div><p class="simulation-copy">Este corte usa sólo la '+esc(friendlyRound(state.currentRound))+' y parte de un capital fijo de $10,000. Los '+pending+' mercados pendientes tienen $0 asignados.</p><div class="simulation-value '+tone+'">'+preciseMoney(provisional)+'</div><div class="simulation-caption">'+headline+' · '+statusCopy+'</div><div class="simulation-metrics"><div class="simulation-metric"><span>Monto por resultado resuelto</span><b>'+preciseMoney(stake)+'</b></div><div class="simulation-metric"><span>Ganancia / pérdida</span><b class="'+tone+'">'+(profit>=0?'+':'')+preciseMoney(profit)+'</b></div><div class="simulation-metric"><span>ROI del corte actual</span><b class="'+tone+'">'+(roi>=0?'+':'')+roi.toFixed(2)+'%</b></div><div class="simulation-metric"><span>Pendientes excluidos</span><b>$0.00 · '+pending+' mercados</b></div></div><div class="simulation-score"><div><b class="positive">'+won+'</b><span>Aciertos</span></div><div><b class="negative">'+lost+'</b><span>Fallos</span></div><div><b>'+pending+'</b><span>Sin monto</span></div></div><details class="simulation-details"><summary>Rendimiento por mercado</summary>'+marketDetails+'</details><details class="simulation-details"><summary>Ver resultado por partido</summary>'+details+'</details><p class="simulation-note">Punto de partida oficial: Jornada 4 · $10,000 MXN. Balance calculado con '+resolved.length+' resultados: '+evaluable.length+' tienen cuota histórica verificable'+(missing?' · '+missing+' sin cuota recuperada':'')+'. Las jornadas 1 a 3 no afectan esta banca.</p></div>';
     }
     function archiveRound(round,fixtures){
       var saved=getPublic();if(!saved.roundArchive)saved.roundArchive={};
@@ -324,7 +341,7 @@
     function showView(name){
       state.view=name;Array.prototype.forEach.call(document.querySelectorAll('.view'),function(v){v.classList.toggle('active',v.id==='view-'+name);});
       Array.prototype.forEach.call(document.querySelectorAll('.bottom-nav button'),function(b){b.classList.toggle('active',b.dataset.view===name);});
-      if(name==='oportunidades')renderOpportunityBoard();window.scrollTo(0,0);
+      if(name==='oportunidades')renderOpportunityBoard();if(name==='temporada')renderSeasonOverview();if(name==='banca'){renderBank();renderRetrospectiveSimulation();}window.scrollTo(0,0);
     }
     function money(value){return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(value)||0);}
     function decimal(value){var n=Number(String(value==null?'':value).replace(',','.').replace(/[^0-9.]/g,''));return isFinite(n)?n:0;}
@@ -340,10 +357,11 @@
       var archive=getPublic().roundArchive||{},rounds=Object.keys(archive);for(var i=0;i<rounds.length;i++){var found=(archive[rounds[i]].fixtures||[]).find(function(f){return Number(f.fixture.id)===id;});if(found)return found;}return null;
     }
     function allOperations(){var saved=getPublic(),all=saved.marketExposure||{},out=[];Object.keys(all).forEach(function(fixtureId){Object.keys(all[fixtureId]||{}).forEach(function(marketId){var row=normalizeOperation(all[fixtureId][marketId],fixtureId,marketId);if(row&&row.amount>0)out.push(row);});});return out.sort(function(a,b){return new Date(b.recordedAt||0)-new Date(a.recordedAt||0);});}
-    function financials(){var saved=getPublic(),initial=Number(saved.bankBalance);if(!isFinite(initial)||initial<0)initial=10000;var settledProfit=0,atRisk=0;allOperations().forEach(function(row){if((row.status==='won'||row.status==='lost'||row.status==='void')&&isFinite(Number(row.profit)))settledProfit+=Number(row.profit);else atRisk+=row.amount;});var current=initial+settledProfit;return {initial:initial,profit:settledProfit,current:current,atRisk:atRisk,available:current-atRisk};}
+    function financials(){var initial=SIMULATION_START_CAPITAL,settledProfit=0,atRisk=0;allOperations().forEach(function(row){var fixture=findFixture(row.fixtureId),round=findFixtureRound(row.fixtureId);if(round&&roundNumber(round)<SIMULATION_START_ROUND)return;if((row.status==='won'||row.status==='lost'||row.status==='void')&&isFinite(Number(row.profit)))settledProfit+=Number(row.profit);else atRisk+=row.amount;});var current=initial+settledProfit;return {initial:initial,profit:settledProfit,current:current,atRisk:atRisk,available:current-atRisk};}
+    function findFixtureRound(fixtureId){var archive=getPublic().roundArchive||{},rounds=Object.keys(archive);for(var i=0;i<rounds.length;i++){if((archive[rounds[i]].fixtures||[]).some(function(f){return String(f.fixture.id)===String(fixtureId);}))return rounds[i];}return state.currentRound;}
     function openExposure(){return financials().atRisk;}
     function exposureSummaryMarkup(){var f=financials();return '<div class="exposure-cell"><span>Banca actual</span><b>'+money(f.current)+'</b></div><div class="exposure-cell '+(f.atRisk>f.current?'warn':'')+'"><span>En juego</span><b>'+money(f.atRisk)+'</b></div><div class="exposure-cell '+(f.available<0?'warn':'')+'"><span>Disponible</span><b>'+money(f.available)+'</b></div>';}
-    function renderExposureSummary(){var html=exposureSummaryMarkup();document.getElementById('global-exposure').innerHTML=html;document.getElementById('detail-exposure').innerHTML=html;renderBank();}
+    function renderExposureSummary(){renderBank();}
     function saveMarketExposure(fixtureId,marketId,selection,amount,odds,timing,source){
       var saved=getPublic(),id=String(fixtureId),cleanAmount=decimal(amount),cleanOdds=decimal(odds),now=new Date().toISOString();if(!saved.marketExposure)saved.marketExposure={};if(!saved.marketExposure[id])saved.marketExposure[id]={};
       var previous=normalizeOperation(saved.marketExposure[id][marketId],id,marketId),available=financials().available+(previous&&previous.status==='pending'?previous.amount:0);if(cleanAmount<=0)return {ok:false,message:'Escribe un monto mayor a cero.'};if(cleanOdds<=1)return {ok:false,message:'Escribe la cuota decimal, por ejemplo 1.85.'};if(cleanAmount>available)return {ok:false,message:'El monto supera tu banca disponible ('+money(Math.max(0,available))+').'};
@@ -629,9 +647,9 @@
         var all=(data[0].response||[]).filter(function(r){return /^Apertura/i.test(r);}).sort(function(a,b){return roundNumber(a)-roundNumber(b);});
         var current=data[1].response&&data[1].response[0];if(!current||all.indexOf(current)<0)current=saved.lastRound&&all.indexOf(saved.lastRound)>-1?saved.lastRound:null;
         if(!current){var now=Date.now(),archive=saved.roundArchive||{};current=all.find(function(r){var games=archive[r]&&archive[r].fixtures||[];return games.some(function(f){return new Date(f.fixture.date).getTime()>now;});})||all[0]||FALLBACK_ROUND;}
-        state.rounds=all.length?all:[current];state.currentRound=current;renderRoundControl();return setRound(current);
+        state.rounds=all.length?all:[current];state.currentRound=current;renderRoundControl();renderSeasonOverview();return setRound(current).then(function(){renderSeasonOverview();});
       }).catch(function(){
-        var cached=getPublic(),round=cached.lastRound||FALLBACK_ROUND;state.rounds=Object.keys(cached.roundArchive||{}).sort(function(a,b){return roundNumber(a)-roundNumber(b);});if(state.rounds.indexOf(round)<0)state.rounds.push(round);state.currentRound=round;renderRoundControl();return setRound(round);
+        var cached=getPublic(),round=cached.lastRound||FALLBACK_ROUND;state.rounds=Object.keys(cached.roundArchive||{}).sort(function(a,b){return roundNumber(a)-roundNumber(b);});if(state.rounds.indexOf(round)<0)state.rounds.push(round);state.currentRound=round;renderRoundControl();renderSeasonOverview();return setRound(round).then(function(){renderSeasonOverview();});
       });
     }
     function loadRound(){
@@ -641,8 +659,8 @@
     document.getElementById('round-select').onchange=function(){setRound(this.value);};
     document.getElementById('round-prev').onclick=function(){var i=state.rounds.indexOf(state.currentRound);if(i>0)setRound(state.rounds[i-1]);};
     document.getElementById('round-next').onclick=function(){var i=state.rounds.indexOf(state.currentRound);if(i>-1&&i<state.rounds.length-1)setRound(state.rounds[i+1]);};
+    document.getElementById('season-back').onclick=function(){document.getElementById('round-panel').classList.add('hidden');document.getElementById('season-overview').classList.remove('hidden');renderSeasonOverview();window.scrollTo(0,0);};
     Array.prototype.forEach.call(document.querySelectorAll('.bottom-nav button'),function(btn){btn.onclick=function(){showView(btn.dataset.view);};});
-    document.getElementById('bank-save').onclick=function(){var value=Number(String(document.getElementById('bank-input').value).replace(/[^0-9.]/g,''));if(!isFinite(value)||value<0)return;publicPatch({bankBalance:value,bankUpdatedAt:new Date().toISOString()});renderExposureSummary();};
     document.addEventListener('visibilitychange',function(){if(!document.hidden)pollLive();});
     window.addEventListener('load',function(){setTimeout(function(){document.getElementById('splash').classList.add('done');},1850);});
     renderExposureSummary();loadRound();
