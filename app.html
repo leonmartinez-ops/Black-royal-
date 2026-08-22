@@ -53,6 +53,7 @@
     .status.live{color:var(--green);border-color:rgba(85,214,139,.35);background:rgba(85,214,139,.08)}
     .status.finished{color:var(--blue);border-color:rgba(121,191,255,.32);background:rgba(121,191,255,.07)}
     .status.today{color:var(--gold);border-color:rgba(216,180,107,.35);background:rgba(216,180,107,.08)}
+    .status.review{color:var(--orange);border-color:rgba(244,169,79,.4);background:rgba(244,169,79,.09)}
     .empty,.error{padding:24px;border:1px dashed var(--line);border-radius:22px;color:var(--muted);font-size:.78rem;line-height:1.55;text-align:center}
     .error{color:#ffadb4;border-color:rgba(255,107,118,.3)}
     .detail{position:fixed;inset:0;z-index:80;overflow-y:auto;background:radial-gradient(90% 35% at 50% -5%,#2a251c 0,#080807 62%);transform:translateX(105%);visibility:hidden;transition:transform .36s cubic-bezier(.25,.8,.25,1),visibility .36s}
@@ -263,16 +264,19 @@
     function mxTime(iso){return new Intl.DateTimeFormat('es-MX',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/Mexico_City'}).format(new Date(iso));}
     function localDay(iso){return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'America/Mexico_City'}).format(new Date(iso));}
     function statusOf(item){return item.fixture&&item.fixture.status?item.fixture.status.short:'NS';}
-    function isLive(item){return LIVE_STATUSES.indexOf(statusOf(item))>-1;}
+    function prematureFinishedStatus(item){var raw=FINISHED_STATUSES.indexOf(statusOf(item))>-1,kickoff=item&&item.fixture&&new Date(item.fixture.date).getTime();return raw&&isFinite(kickoff)&&Date.now()<kickoff+95*60*1000;}
+    function isLive(item){return !prematureFinishedStatus(item)&&LIVE_STATUSES.indexOf(statusOf(item))>-1;}
     function updateSeasonActivity(){var button=document.querySelector('.bottom-nav button[data-view="temporada"]'),active=state.fixtures.length>0&&!state.fixtures.every(isFinished);if(button)button.classList.toggle('season-live',active);}
-    function isFinished(item){return FINISHED_STATUSES.indexOf(statusOf(item))>-1;}
+    function isFinished(item){return !prematureFinishedStatus(item)&&FINISHED_STATUSES.indexOf(statusOf(item))>-1;}
     function bucket(item){
+      if(prematureFinishedStatus(item))return 'ESTADO EN REVISIÓN';
       if(isLive(item))return 'EN VIVO';
       if(isFinished(item))return 'FINALIZADOS';
       var d=localDay(item.fixture.date), today=localDay(new Date().toISOString());
       return d===today?'PARTIDOS DE HOY':'PRÓXIMOS';
     }
     function statusLabel(item){
+      if(prematureFinishedStatus(item))return 'Estado en revisión';
       if(isLive(item))return (item.fixture.status.elapsed||'')+'\'';
       if(isFinished(item))return 'Finalizado';
       return localDay(item.fixture.date)===localDay(new Date().toISOString())?'Hoy':'Próximo';
@@ -281,7 +285,7 @@
       var v=item.fixture.venue||{};return [v.name,v.city].filter(Boolean).join(' · ')||'Ubicación por confirmar';
     }
     function renderMatch(item){
-      var cls=isLive(item)?'live':isFinished(item)?'finished':localDay(item.fixture.date)===localDay(new Date().toISOString())?'today':'';
+      var cls=prematureFinishedStatus(item)?'review':isLive(item)?'live':isFinished(item)?'finished':localDay(item.fixture.date)===localDay(new Date().toISOString())?'today':'';
       var score=isFinished(item)||isLive(item)?' · '+(item.goals.home==null?0:item.goals.home)+'–'+(item.goals.away==null?0:item.goals.away):'';
       var top=opportunities(item.fixture.id)[0],placed=fixtureExposure(item.fixture.id),signal=top?'<div class="match-signal">Mejor señal · '+esc(marketNames[top.id]||top.id)+' '+esc(top.selection)+(placed?' · Expuesto '+money(placed):'')+'</div>':placed?'<div class="match-signal">Expuesto '+money(placed)+'</div>':'';
       return '<button class="match" data-id="'+item.fixture.id+'">'+
@@ -291,7 +295,7 @@
         '<div class="status '+cls+'">'+esc(statusLabel(item))+'</div></button>';
     }
     function renderMatchday(){
-      var order=['EN VIVO','PARTIDOS DE HOY','PRÓXIMOS','FINALIZADOS'], groups={};
+      var order=['ESTADO EN REVISIÓN','EN VIVO','PARTIDOS DE HOY','PRÓXIMOS','FINALIZADOS'], groups={};
       state.fixtures.forEach(function(f){var b=bucket(f);(groups[b]||(groups[b]=[])).push(f);});
       var html='';
       order.forEach(function(name){if(!groups[name]||!groups[name].length)return;html+='<div class="section"><h2>'+name+'</h2><span>'+groups[name].length+' partidos</span></div>'+groups[name].map(renderMatch).join('');});
@@ -426,7 +430,7 @@
       return isFinished(detail)?resultForOperation(item,detail,row)||'pending':'pending';
     }
     function settleFixtureOperations(item,detail){
-      if(!item||!detail)return false;var saved=getPublic(),id=String(item.fixture.id),rows=saved.marketExposure&&saved.marketExposure[id];if(!rows)return false;var changed=false;Object.keys(rows).forEach(function(marketId){var row=normalizeOperation(rows[marketId],id,marketId);if(row.status==='won'||row.status==='lost'||row.status==='void')return;var result=operationOutcome(item,detail,row);if(!result||result==='pending')return;row.detectedOutcome=result;if(result==='lost'){row.status='lost';row.returnAmount=0;row.profit=-row.amount;}else if(result==='void'){row.status='void';row.returnAmount=row.amount;row.profit=0;}else if(row.odds>1){row.status='won';row.returnAmount=row.amount*row.odds;row.profit=row.returnAmount-row.amount;}else{row.status='unsettled';}row.settledAt=new Date().toISOString();row.settlementMode=isFinished(detail)?'final':'live';rows[marketId]=row;changed=true;});if(changed)savePublic(saved);return changed;
+      if(!item||!detail)return false;var saved=getPublic(),id=String(item.fixture.id),rows=saved.marketExposure&&saved.marketExposure[id];if(!rows)return false;var changed=false;if(prematureFinishedStatus(detail)){Object.keys(rows).forEach(function(marketId){var row=normalizeOperation(rows[marketId],id,marketId);if(row.manualSettlement||['won','lost','void'].indexOf(row.status)<0)return;row.status='pending';row.profit=null;row.returnAmount=null;delete row.detectedOutcome;delete row.settledAt;delete row.settlementMode;rows[marketId]=row;changed=true;});if(changed)savePublic(saved);return changed;}Object.keys(rows).forEach(function(marketId){var row=normalizeOperation(rows[marketId],id,marketId);if(row.status==='won'||row.status==='lost'||row.status==='void')return;var result=operationOutcome(item,detail,row);if(!result||result==='pending')return;row.detectedOutcome=result;if(result==='lost'){row.status='lost';row.returnAmount=0;row.profit=-row.amount;}else if(result==='void'){row.status='void';row.returnAmount=row.amount;row.profit=0;}else if(row.odds>1){row.status='won';row.returnAmount=row.amount*row.odds;row.profit=row.returnAmount-row.amount;}else{row.status='unsettled';}row.settledAt=new Date().toISOString();row.settlementMode=isFinished(detail)?'final':'live';rows[marketId]=row;changed=true;});if(changed)savePublic(saved);return changed;
     }
     function statusCopy(row){if(row.status==='won')return ['Ganada','good'];if(row.status==='lost')return ['Perdida','fail'];if(row.status==='void')return ['Devuelta','pending'];if(row.status==='unsettled')return ['Falta cuota','caution'];return ['Pendiente','pending'];}
     function ledgerMarkup(rows){if(!rows.length)return '<div class="empty">Todavía no hay operaciones en esta sección.</div>';return rows.map(function(row){var fixture=findFixture(row.fixtureId),teams=fixture?fixture.teams.home.name+' vs '+fixture.teams.away.name:'Partido '+row.fixtureId,status=statusCopy(row),pnl=row.profit==null?'—':(row.profit>=0?'+':'')+money(row.profit),settlement=row.settlementMode==='live'?' · Liquidada en vivo':'',manual=(row.status==='pending'||row.status==='unsettled')?'<div class="operation-actions"><select class="ledger-status" aria-label="Resultado manual"><option value="">Liquidar manualmente…</option><option value="won">Ganada</option><option value="lost">Perdida</option><option value="void">Devuelta</option></select><button class="save-operation settle-manual" data-fixture="'+esc(row.fixtureId)+'" data-market="'+esc(row.marketId)+'">Aplicar</button></div>':'';return '<div class="ledger-row"><div class="ledger-head"><div><b>'+esc(teams)+'</b><small>'+esc(row.marketLabel)+' · '+esc(row.selection)+'<br>'+(row.firstTiming==='prepartido'?'Registrada antes del inicio':'Registro posterior al inicio')+settlement+'</small></div><span class="badge '+status[1]+'">'+status[0]+'</span></div><div class="ledger-numbers"><div class="ledger-number"><span>Monto</span><b>'+money(row.amount)+'</b></div><div class="ledger-number"><span>Cuota</span><b>'+Number(row.odds||0).toFixed(2)+'</b></div><div class="ledger-number"><span>Ganancia / pérdida</span><b class="'+(row.profit>0?'positive':row.profit<0?'negative':'')+'">'+pnl+'</b></div></div>'+manual+'</div>';}).join('');}
@@ -705,7 +709,7 @@
       return Promise.all(targets.map(function(item){return api('fixtures',{id:item.fixture.id}).then(function(data){var detail=data.response&&data.response[0];if(detail)state.details[String(item.fixture.id)]=detail;}).catch(function(){});})).then(function(){renderRoundSummary();cacheRoundPerformance();if(state.view==='oportunidades')renderPerformanceChart();if(state.selected&&state.details[String(state.selected)]){var selected=findFixture(state.selected);if(selected)renderDetail(selected,state.details[String(state.selected)]);}});
     }
     function refreshSettlements(){
-      var ids=[],operations=allOperations();operations.forEach(function(row){var fixture=findFixture(row.fixtureId);if(fixture&&(isLive(fixture)||isFinished(fixture))&&row.status!=='won'&&row.status!=='lost'&&row.status!=='void'&&ids.indexOf(Number(row.fixtureId))<0)ids.push(Number(row.fixtureId));});
+      var ids=[],operations=allOperations();operations.forEach(function(row){var fixture=findFixture(row.fixtureId),needsReview=fixture&&prematureFinishedStatus(fixture)&&!row.manualSettlement;if(fixture&&(needsReview||isLive(fixture)||isFinished(fixture))&&(needsReview||row.status!=='won'&&row.status!=='lost'&&row.status!=='void')&&ids.indexOf(Number(row.fixtureId))<0)ids.push(Number(row.fixtureId));});
       if(!ids.length)return Promise.resolve();var chain=Promise.resolve();ids.forEach(function(id){chain=chain.then(function(){var item=findFixture(id);return api('fixtures',{id:id}).then(function(data){var detail=data.response&&data.response[0]||item;if(settleFixtureOperations(item,detail)){renderExposureSummary();renderMatchday();}}).catch(function(){});});});return chain;
     }
     function pollLive(){
