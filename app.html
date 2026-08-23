@@ -633,7 +633,7 @@
         if(token!==state.analysisToken){state.analysisRunning=false;node.classList.add('hidden');return;}
         if(!pending.length){state.analysisRunning=false;label.textContent='Análisis de jornada preparado';renderMatchday();renderOpportunityBoard();setTimeout(function(){node.classList.add('hidden');},1800);return;}
         var item=pending.shift();label.textContent='Analizando '+(++done)+' de '+(done+pending.length)+': '+item.teams.home.name+' vs '+item.teams.away.name;
-        ensureAnalysis(item).catch(function(){return null;}).then(function(){setTimeout(next,700);});
+        ensureAnalysis(item).catch(function(error){console.error('RIS_ANALYSIS_ERROR',item.fixture.id,error&&error.message||error);return null;}).then(function(){setTimeout(next,700);});
       }
       next();
     }
@@ -726,7 +726,7 @@
       var item=state.fixtures.find(function(f){return f.fixture.id===id;});if(!item)return;
       state.selected=id;var panel=document.getElementById('detail');panel.classList.add('on');panel.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';
       document.getElementById('detail-content').innerHTML='<div class="hero"><div class="loader"><i></i>Analizando historial, mercado y señal RIS…</div></div>';
-      Promise.all([fetchFixtureData(item),ensureAnalysis(item).catch(function(){return null;})]).then(function(data){
+      Promise.all([fetchFixtureData(item),ensureAnalysis(item).catch(function(error){console.error('RIS_ANALYSIS_ERROR',item.fixture.id,error&&error.message||error);return null;})]).then(function(data){
         var detail=data[0]||item;observeFixtureStatus(detail);renderDetail(item,detail);
       });
     }
