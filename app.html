@@ -557,8 +557,8 @@
     function analyzeFixture(item){
       var id=item.fixture.id,homeId=item.teams.home.id,awayId=item.teams.away.id;
       return Promise.all([
-        api('predictions',{fixture:id}),api('odds',{fixture:id}),
-        api('fixtures',{team:homeId,last:50}),api('fixtures',{team:awayId,last:50})
+        api('predictions',{fixture:id}).catch(function(){return {response:[]};}),api('odds',{fixture:id}).catch(function(){return {response:[]};}),
+        api('fixtures',{team:homeId,last:50}).catch(function(){return {response:[]};}),api('fixtures',{team:awayId,last:50}).catch(function(){return {response:[]};})
       ]).then(function(data){
         var prediction=data[0]&&data[0].response&&data[0].response[0],bets=allBets(data[1]);
         var homeHistory=data[2].response||[],awayHistory=data[3].response||[],history=uniqueHistory(homeHistory,awayHistory);
