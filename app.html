@@ -621,7 +621,7 @@
       });
     }
     function ensureAnalysis(item){
-      var existing=savedSnapshot(item.fixture.id);if(existing)return existing.marketOdds&&Object.keys(existing.marketOdds).length?Promise.resolve(existing):backfillSnapshotOdds(item,existing);
+      var existing=savedSnapshot(item.fixture.id),hasMarkets=existing&&existing.m&&Object.keys(existing.m).some(function(key){var tuple=existing.m[key];return tuple&&tuple[0]!=null&&tuple[1]!=null;});if(existing&&(!hasMarkets||existing.tournament&&existing.tournament!==activeTournament)&&!isLive(item)&&!isFinished(item))return analyzeFixture(item);if(existing)return existing.marketOdds&&Object.keys(existing.marketOdds).length?Promise.resolve(existing):backfillSnapshotOdds(item,existing);
       if(isLive(item)||isFinished(item))return Promise.resolve(null);
       return analyzeFixture(item);
     }
